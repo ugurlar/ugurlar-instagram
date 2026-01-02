@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hamurlabs Ürün Paneli</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-content">
+        <div class="logo">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            <polyline points="7.5 4.21 12 6.81 16.5 4.21"/>
+            <polyline points="7.5 19.79 7.5 14.6 3 12"/>
+            <polyline points="21 12 16.5 14.6 16.5 19.79"/>
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+            <line x1="12" y1="22.08" x2="12" y2="12"/>
+          </svg>
+          <h1>Hamurlabs Ürün Paneli</h1>
+        </div>
+        <div class="header-info">
+          <span class="badge">v1.0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Search Section -->
+      <section class="search-section">
+        <div class="search-card">
+          <h2>Ürün Ara</h2>
+          <p class="search-description">Ürün kodu veya barkod numarası ile arama yapın</p>
+          <form id="searchForm" class="search-form">
+            <div class="input-group">
+              <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Ürün kodu veya barkod girin..."
+                autocomplete="off"
+              >
+              <button type="submit" class="btn-search">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="m21 21-4.3-4.3"/>
+                </svg>
+                Ara
+              </button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Loading State -->
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>Ürünler aranıyor...</p>
+      </div>
+
+      <!-- Error State -->
+      <div id="error" class="error-message hidden">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p id="errorText">Bir hata oluştu</p>
+      </div>
+
+      <!-- Results Section -->
+      <section id="results" class="results-section hidden">
+        <div class="results-header">
+          <h2>Sonuçlar</h2>
+          <span id="resultCount" class="result-count">0 ürün bulundu</span>
+        </div>
+        <div id="productList" class="product-list"></div>
+      </section>
+
+      <!-- Empty State -->
+      <section id="emptyState" class="empty-state">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+          <line x1="12" y1="22.08" x2="12" y2="12"/>
+        </svg>
+        <h3>Ürün Aramaya Başlayın</h3>
+        <p>Ürün kodu veya barkod girerek arama yapabilirsiniz</p>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>© 2026 Hamurlabs Ürün Paneli</p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
