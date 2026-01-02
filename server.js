@@ -183,7 +183,7 @@ app.get('/api/stock', async (req, res) => {
   }
 });
 
-// 4. AI Metin Üretimi
+// 4. AI Metin Üretimi (Gelişmiş Fallback Mekanizması)
 app.post('/api/generate-text', async (req, res) => {
   try {
     const { product } = req.body;
@@ -212,13 +212,43 @@ app.post('/api/generate-text', async (req, res) => {
       6. Kısa tut.
     `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const response = await axios.post(url, { contents: [{ parts: [{ text: prompt }] }] });
+    // Denenecek modeller listesi (Biri çalışmazsa diğerine geç)
+    const models = [
+      'gemini-2.0-flash-exp',
+      'gemini-1.5-flash',
+      'gemini-1.5-flash-latest',
+      'gemini-pro',
+      'gemini-1.0-pro'
+    ];
 
-    const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!text) throw new Error('Metin üretilemedi');
+    let lastError = null;
+    let successText = null;
 
-    res.json({ text });
+    for (const model of models) {
+      try {
+        console.log(`🤖 Model deneniyor: ${model}`);
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await axios.post(url, {
+          contents: [{ parts: [{ text: prompt }] }]
+        });
+
+        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          successText = response.data.candidates[0].content.parts[0].text;
+          console.log(`✅ Başarılı Model: ${model}`);
+          break; // Döngüyü kır, sonucu bulduk
+        }
+      } catch (err) {
+        console.error(`❌ ${model} başarısız:`, err.message);
+        lastError = err;
+        // Devam et, sıradaki modeli dene
+      }
+    }
+
+    if (successText) {
+      res.json({ text: successText });
+    } else {
+      throw lastError || new Error('Hiçbir AI modeli yanıt vermedi.');
+    }
 
   } catch (error) {
     console.error('AI Error:', error.response?.data || error.message);
