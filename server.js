@@ -221,8 +221,9 @@ app.post('/api/generate-text', async (req, res) => {
     res.json({ text });
 
   } catch (error) {
-    console.error('AI Error:', error.message);
-    res.status(500).json({ error: 'AI Hatası' });
+    console.error('AI Error:', error.response?.data || error.message);
+    const detailedError = error.response?.data?.error?.message || error.message;
+    res.status(500).json({ error: `AI Hatası: ${detailedError}` });
   }
 });
 
