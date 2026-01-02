@@ -5,11 +5,5 @@
             "source": "/(.*)",
             "destination": "/server.js"
         }
-    ],
-    "crons": [
-        {
-            "path": "/api/cron",
-            "schedule": "0 5 * * *"
-        }
     ]
 }
