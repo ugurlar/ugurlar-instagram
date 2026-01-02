@@ -214,6 +214,7 @@ app.post('/api/generate-text', async (req, res) => {
 
     // Denenecek modeller listesi (Biri çalışmazsa diğerine geç)
     const models = [
+      'gemini-2.5-flash',
       'gemini-2.0-flash-exp',
       'gemini-1.5-flash',
       'gemini-1.5-flash-latest',
