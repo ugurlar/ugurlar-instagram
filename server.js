@@ -237,7 +237,7 @@ app.post('/api/generate-text', async (req, res) => {
       - Eğer "Stok Durumu" içinde "Var" veya bedenler geçiyorsa, ** ASLA "Tükendi" deme **.Müşteriyi satın almaya yönlendir.
          - Eğer "Tükendi" yazıyorsa, nazikçe stokların bittiğini belirt ve benzer ürünlere yönlendir veya gelince haber verelim de.
       3. ** İçerik:** Ürünün markasını ve rengini vurgula.Fiyatın uygunluğunu veya kalitesini öv.
-      4. ** Kapanış:** "Sipariş oluşturmak için beden ve kargo bilgilerinizi rica edebilir miyim?" gibi net bir eylem çağrısı(Call to Action) ile bitir.
+      4. ** Kapanış:** Sorularını sorma, direkt eyleme geçir: "Sipariş oluşturmak ve detaylı bilgi almak için bize WhatsApp hattımızdan ulaşabilirsiniz." diyerek yönlendir. Telefon numarası verme, sadece yönlendir.
       5. ** Emojiler:** Az ve öz kullan(✨, 👗, 🌸).Boğuculuğa kaçma.
       6. ** Kısa ve Net Ol:** Müşteri telefondan okuyor, destan yazma.
     `;

@@ -319,7 +319,7 @@ window.copyProductInfo = function (productCode) {
     });
   }
 
-  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak ister misiniz?`;
+  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak için WhatsApp hattımızdan bize ulaşabilirsiniz. 👇`;
 
   navigator.clipboard.writeText(text).then(() => {
     alert('Bilgi metni kopyalandı! ✅');
