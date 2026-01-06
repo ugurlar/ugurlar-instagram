@@ -219,16 +219,17 @@ app.post('/api/generate-text', async (req, res) => {
 
     if (!apiKey) return res.status(500).json({ error: 'API Key eksik' });
 
-      Sen profesyonel bir butik / mağaza satış danışmanısın.Müşteriye Instagram DM üzerinden gönderilecek bir yanıt hazırlıyorsun.
+    const prompt = `
+      Sen profesyonel bir butik/mağaza satış danışmanısın. Müşteriye Instagram DM üzerinden gönderilecek bir yanıt hazırlıyorsun.
       
       Ürün Bilgileri:
-    - Ürün Adı: ${ product.name }
-    - Marka: ${ product.brand }
-    - Renk: ${ product.color }
-    - Fiyat: ${ product.price }
-    - Stok Durumu: ${ product.stockStatus }
-    - Mevcut Bedenler: ${ product.sizes || '-' }
-    - Kategori: ${ product.category }
+    - Ürün Adı: ${product.name}
+    - Marka: ${product.brand}
+    - Renk: ${product.color}
+    - Fiyat: ${product.price}
+    - Stok Durumu: ${product.stockStatus}
+    - Mevcut Bedenler: ${product.sizes || '-'}
+    - Kategori: ${product.category}
 
     Kurallar:
     1. ** Ton:** Samimi ama profesyonel ol. (Çok "cıvık" olma, "canım", "aşkım" gibi kelimeler kullanma. "Hanımefendi" de deme. "Merhabalar", "Selamlar" gibi sıcak ama saygılı bir giriş yap.)
@@ -256,35 +257,35 @@ app.post('/api/generate-text', async (req, res) => {
 
     for (const model of models) {
       try {
-        console.log(`🤖 Model deneniyor: ${ model } `);
+        console.log(`🤖 Model deneniyor: ${model} `);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-    const response = await axios.post(url, {
-      contents: [{ parts: [{ text: prompt }] }]
-    });
+        const response = await axios.post(url, {
+          contents: [{ parts: [{ text: prompt }] }]
+        });
 
-    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-      successText = response.data.candidates[0].content.parts[0].text;
-      console.log(`✅ Başarılı Model: ${model}`);
-      break; // Döngüyü kır, sonucu bulduk
+        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          successText = response.data.candidates[0].content.parts[0].text;
+          console.log(`✅ Başarılı Model: ${model}`);
+          break; // Döngüyü kır, sonucu bulduk
+        }
+      } catch (err) {
+        console.error(`❌ ${model} başarısız:`, err.message);
+        lastError = err;
+        // Devam et, sıradaki modeli dene
+      }
     }
-  } catch (err) {
-    console.error(`❌ ${model} başarısız:`, err.message);
-    lastError = err;
-    // Devam et, sıradaki modeli dene
-  }
-}
 
     if (successText) {
-  res.json({ text: successText });
-} else {
-  throw lastError || new Error('Hiçbir AI modeli yanıt vermedi.');
-}
+      res.json({ text: successText });
+    } else {
+      throw lastError || new Error('Hiçbir AI modeli yanıt vermedi.');
+    }
 
   } catch (error) {
-  console.error('AI Error:', error.response?.data || error.message);
-  const detailedError = error.response?.data?.error?.message || error.message;
-  res.status(500).json({ error: `AI Hatası: ${detailedError}` });
-}
+    console.error('AI Error:', error.response?.data || error.message);
+    const detailedError = error.response?.data?.error?.message || error.message;
+    res.status(500).json({ error: `AI Hatası: ${detailedError}` });
+  }
 });
 
 // 5. CRON JOB (Vercel için)
