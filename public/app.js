@@ -100,6 +100,9 @@ function displayProducts(products, stockData) {
   }).join('');
 
   resultsSection.classList.remove('hidden');
+
+  // Shopify linklerini ve durumlarını yükle
+  loadShopifyStatus(productArray);
 }
 
 function createProductCard(product) {
@@ -151,6 +154,13 @@ function createProductCard(product) {
             <div class="info-label">Sezon</div>
             <div class="info-value">${escapeHtml(season)}</div>
           </div>
+          <div class="info-item shopify-link-container" id="shopify-link-${escapeHtml(code)}">
+            <div class="info-label">Shopify Link</div>
+            <div class="info-value">
+              <span class="status-dot status-loading"></span>
+              <span class="status-text">Kontrol ediliyor...</span>
+            </div>
+          </div>
         </div>
         
         ${createStockTable(metaVariants, product.stockInfo)}
@@ -172,6 +182,43 @@ function createProductCard(product) {
       </div>
     </article>
   `;
+}
+
+// Shopify Durumunu ve Linkini Yukle
+async function loadShopifyStatus(products) {
+  for (const product of products) {
+    const code = product.code;
+    const container = document.getElementById(`shopify-link-${code}`);
+    if (!container) continue;
+
+    try {
+      const response = await fetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(code)}`);
+      const data = await response.json();
+
+      const valueDiv = container.querySelector('.info-value');
+
+      if (data.found && data.url) {
+        valueDiv.innerHTML = `
+          <a href="${data.url}" target="_blank" class="shopify-url-link">
+            <span class="status-dot status-success"></span>
+            <span class="status-text success">Sitede Var</span>
+          </a>
+        `;
+      } else {
+        valueDiv.innerHTML = `
+          <span class="status-dot status-error"></span>
+          <span class="status-text error">Sitede Bulunamadı</span>
+        `;
+      }
+    } catch (error) {
+      console.error('Shopify fetch error:', error);
+      const valueDiv = container.querySelector('.info-value');
+      valueDiv.innerHTML = `
+        <span class="status-dot status-error"></span>
+        <span class="status-text error">Hata oluştu</span>
+      `;
+    }
+  }
 }
 
 // Global scope AI function - REFACTOR: Uses Global Cache
