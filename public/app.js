@@ -106,24 +106,30 @@ function createProductCard(product, stockData) {
   return `
     <article class="product-card">
       <div class="product-header">
-        <div class="product-image-container">
-          ${imageUrl
-      ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'product-image-placeholder\\'>📷</div>'">`
+        <div class="product-header-content">
+             <div class="product-image-container">
+                ${imageUrl
+      ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" loading="lazy">`
       : '<div class="product-image-placeholder">📷</div>'
     }
-        </div>
-        
-        <div class="product-header-content">
-          <div>
-              <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
-              <span class="product-code">${escapeHtml(product.code || product.sku || '-')}</span>
-          </div>
-          <div class="product-price">${price}</div>
+             </div>
+             <div class="product-title-group">
+                <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
+                <div class="product-price">${price}</div>
+             </div>
         </div>
       </div>
       
       <div class="product-body">
-        <div class="product-info-grid">
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="info-label">Ürün Kodu</div>
+            <div class="info-value copy-code" onclick="copyToClipboard('${escapeHtml(product.code)}')" title="Kopyala">${escapeHtml(product.code)}</div>
+          </div>
+          <div class="info-item">
+            <div class="info-label">Barkod</div>
+            <div class="info-value">${escapeHtml(product.barcode)}</div>
+          </div>
           <div class="info-item">
             <div class="info-label">Marka</div>
             <div class="info-value">${escapeHtml(brand)}</div>
@@ -131,10 +137,6 @@ function createProductCard(product, stockData) {
           <div class="info-item">
             <div class="info-label">Renk</div>
             <div class="info-value">${escapeHtml(color)}</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">Kategori</div>
-            <div class="info-value">${escapeHtml(category)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Sezon</div>
@@ -145,10 +147,28 @@ function createProductCard(product, stockData) {
         ${createStockTable(metaVariants, stockInfo)}
 
         <div class="action-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
-            <button onclick="copyProductInfo('${escapeHtml(product.name)}', '${escapeHtml(product.code)}', '${price}', '${escapeHtml(color)}', '${escapeHtml(brand)}')" class="copy-btn" style="flex: 1; padding: 10px; background: #eee; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
+            <button 
+                data-name="${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}"
+                data-code="${escapeHtml(product.code || product.sku || '-')}"
+                data-brand="${escapeHtml(brand)}"
+                data-color="${escapeHtml(color)}"
+                data-price="${price}"
+                data-variants="${escapeHtml(JSON.stringify(metaVariants))}"
+                onclick="copyProductInfo(this)" 
+                class="copy-btn" 
+                style="flex: 1; padding: 10px; background: #eee; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
                 📋 Bilgi Metni Kopyala
             </button>
-            <button onclick="generateAIText('${escapeHtml(product.name)}', '${escapeHtml(brand)}', '${escapeHtml(color)}', '${price}', '${escapeHtml(category)}', '${stockInfo.quantity > 0 ? 'Stokta Var' : 'Tükendi'}')" class="ai-btn" style="flex: 1; padding: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px;">
+            <button 
+                data-name="${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}"
+                data-brand="${escapeHtml(brand)}"
+                data-color="${escapeHtml(color)}"
+                data-price="${price}"
+                data-category="${escapeHtml(category)}"
+                data-variants="${escapeHtml(JSON.stringify(metaVariants))}"
+                onclick="generateAIText(this)" 
+                class="ai-btn" 
+                style="flex: 1; padding: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px;">
                 ✨ AI ile Satış Metni Yaz
             </button>
         </div>
@@ -158,9 +178,30 @@ function createProductCard(product, stockData) {
 }
 
 // Global scope AI function
-window.generateAIText = async function (name, brand, color, price, category, stockStatus) {
-  // Show AI loading modal (basit bir prompt/alert yerine custom div daha iyi olur ama hizlica alert/prompt ile baslayalim, sonra gelistiririz)
-  // Ancak kullanici deneyimi icin bir overlay olusturalim.
+window.generateAIText = async function (btn) {
+  const name = btn.dataset.name;
+  const brand = btn.dataset.brand;
+  const color = btn.dataset.color;
+  const price = btn.dataset.price;
+  const category = btn.dataset.category;
+
+  let variants = [];
+  try {
+    variants = JSON.parse(btn.dataset.variants || '[]');
+  } catch (e) {
+    console.error('JSON Parse Error:', e);
+  }
+
+  // Stok Durumunu Analiz Et
+  let stockStatus = "Tükendi";
+  let availableSizes = [];
+
+  if (variants.length > 0) {
+    availableSizes = variants.filter(v => (v.quantity || 0) > 0).map(v => v.value || v.size || v.name);
+    if (availableSizes.length > 0) {
+      stockStatus = `Stokta Var (${availableSizes.join(', ')})`;
+    }
+  }
 
   const loadingId = 'ai-loading-' + Date.now();
   const overlay = document.createElement('div');
@@ -178,7 +219,7 @@ window.generateAIText = async function (name, brand, color, price, category, sto
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        product: { name, brand, color, price, category, stockStatus }
+        product: { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', ') }
       })
     });
 
@@ -268,12 +309,34 @@ function createStockTable(variants, stockInfo) {
   return '<div class="no-stock-info">Detaylı stok bilgisi yok</div>';
 }
 
-// Global scope'a kopyalama fonksiyonunu ekle
-window.copyProductInfo = function (name, code, price, color, brand) {
-  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${code}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}\n\nSipariş oluşturmak ister misiniz?`;
+// Global scope copy function
+window.copyProductInfo = function (btn) {
+  const name = btn.dataset.name;
+  const code = btn.dataset.code;
+  const brand = btn.dataset.brand;
+  const color = btn.dataset.color;
+  const price = btn.dataset.price;
+
+  let variants = [];
+  try {
+    variants = JSON.parse(btn.dataset.variants || '[]');
+  } catch (e) {
+    console.error('JSON Parse Error:', e);
+  }
+
+  let stockText = "";
+  if (variants.length > 0) {
+    stockText = "\n\nStok Durumu:\n";
+    variants.forEach(v => {
+      const qty = v.quantity || 0;
+      stockText += `${v.value || v.size || v.name}: ${qty > 0 ? qty + ' Adet' : 'Tükendi'}\n`;
+    });
+  }
+
+  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${code}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak ister misiniz?`;
 
   navigator.clipboard.writeText(text).then(() => {
-    alert('Bilgi metni kopyalandı!');
+    alert('Bilgi metni kopyalandı! ✅');
   }).catch(err => console.error('Kopyalama hatası:', err));
 }
 
@@ -325,7 +388,8 @@ function hideAll() {
   resultsSection.classList.add('hidden');
   emptyState.classList.add('hidden');
 }
-// System Status Logic
+
+// System Status Logic (Added in separate chunk effectively merged above due to full rewrite)
 document.addEventListener('DOMContentLoaded', () => {
   const btnStatus = document.getElementById('btn-system-status');
   if (btnStatus) {
@@ -391,12 +455,21 @@ async function showSystemStatus() {
     document.getElementById('status-content').innerHTML = `<p style="color: #ef4444;">Veri alınamadı: ${error.message}</p>`;
   }
 }
+
 // Utility Functions
 function escapeHtml(text) {
   if (!text) return '-';
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Utility: Copy Code
+window.copyToClipboard = function (text) {
+  navigator.clipboard.writeText(text).then(() => {
+    // Optional: show tooltip
+    console.log('Copied');
+  }).catch(err => console.error('Copy failed', err));
 }
 
 // Initialize
