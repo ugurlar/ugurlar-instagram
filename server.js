@@ -155,7 +155,35 @@ app.get('/api/products/search', async (req, res) => {
       name: item.name,
       selling_price: item.price,
       options: { Marka: item.brand, 'Ana Renk': '-', 'Sezon/Yil': '-', 'Ürün Grubu': item.category },
-      is_stock: item.stock_status === 'Var'
+      is_stock: item.stock_status === 'Var',
+      variants: item.variants || [] // Varsa varyantları da al
+    });
+
+    // AKILLI SIRALAMA (Smart Ranking)
+    // 1. Stokta Olanlar En Üstte
+    // 2. Sezonu Yeni Olanlar (2025 > 2024)
+    // 3. Kodu Arananla Tam Eşleşenler
+    results.sort((a, b) => {
+      // 1. Stok Kontrolü
+      const stockA = a.is_stock ? 1 : 0;
+      const stockB = b.is_stock ? 1 : 0;
+      if (stockA !== stockB) return stockB - stockA; // Stokta olanlar önce
+
+      // 2. Sezon Kontrolü (String'den Yıl Çıkarma)
+      const getYear = (seasonStr) => {
+        if (!seasonStr) return 0;
+        const match = seasonStr.match(/(\d{4})/);
+        return match ? parseInt(match[1]) : 0;
+      };
+      const seasonA = getYear(a.options?.['Sezon/Yil']);
+      const seasonB = getYear(b.options?.['Sezon/Yil']);
+      if (seasonA !== seasonB) return seasonB - seasonA; // Yeni yıl önce
+
+      // 3. Kod Tam Eşleşme (Bonus)
+      if (a.code === query && b.code !== query) return -1;
+      if (b.code === query && a.code !== query) return 1;
+
+      return 0;
     });
 
     res.json({
