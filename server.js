@@ -230,6 +230,7 @@ app.post('/api/generate-text', async (req, res) => {
     - Stok Durumu: ${product.stockStatus}
     - Mevcut Bedenler: ${product.sizes || '-'}
     - Kategori: ${product.category}
+    - Ürün Linki: ${product.url}
 
     Kurallar:
     1. ** Ton:** Samimi ama profesyonel ol. (Çok "cıvık" olma, "canım", "aşkım" gibi kelimeler kullanma. "Hanımefendi" de deme. "Merhabalar", "Selamlar" gibi sıcak ama saygılı bir giriş yap.)
@@ -238,6 +239,7 @@ app.post('/api/generate-text', async (req, res) => {
          - Eğer "Tükendi" yazıyorsa, nazikçe stokların bittiğini belirt ve benzer ürünlere yönlendir veya gelince haber verelim de.
       3. ** İçerik:** Ürünün markasını ve rengini vurgula.Fiyatın uygunluğunu veya kalitesini öv.
       4. ** Kapanış:** Sorularını sorma, direkt eyleme geçir: "Sipariş oluşturmak ve detaylı bilgi almak için bize WhatsApp hattımızdan ulaşabilirsiniz." diyerek yönlendir. Telefon numarası verme, sadece yönlendir.
+         - **ÖNEMLİ:** Mesajın en sonuna veya uygun bir yerine mutlaka ürünün web sitesindeki linkini (${product.url}) de ekle. "Ürünü web sitemizden incelemek için: [Link]" gibi.
       5. ** Emojiler:** Az ve öz kullan(✨, 👗, 🌸).Boğuculuğa kaçma.
       6. ** Kısa ve Net Ol:** Müşteri telefondan okuyor, destan yazma.
     `;

@@ -189,6 +189,11 @@ window.generateAIText = async function (productCode) {
   const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
   const variants = product.metas || [];
 
+  // URL Creation
+  const slug = createSlug(name);
+  // Shopify URL Genellikle: /products/urun-adi formundadir
+  const productUrl = `https://ugurlar.com/products/${slug}`;
+
   // Stok Durumunu Analiz Et
   let stockStatus = "Tükendi";
   let availableSizes = [];
@@ -219,7 +224,7 @@ window.generateAIText = async function (productCode) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        product: { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', ') }
+        product: { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', '), url: productUrl }
       })
     });
 
@@ -296,6 +301,21 @@ function createStockTable(variants, stockInfo) {
   return '<div class="no-stock-info">Detaylı stok bilgisi yok</div>';
 }
 
+// Utility: Slugify for Shopify URL
+function createSlug(text) {
+  if (!text) return '';
+  const map = {
+    'ç': 'c', 'ğ': 'g', 'ı': 'i', 'İ': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+    'Ç': 'c', 'Ğ': 'g', 'I': 'i', 'Ö': 'o', 'Ş': 's', 'Ü': 'u'
+  };
+
+  return text.split('').map(char => map[char] || char)
+    .join('').toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '') // Remove invalid chars
+    .trim()
+    .replace(/\s+/g, '-'); // Replace spaces with -
+}
+
 // Global scope copy function - REFACTOR: Uses Global Cache
 window.copyProductInfo = function (productCode) {
   const product = window.pageProducts[productCode];
@@ -310,6 +330,10 @@ window.copyProductInfo = function (productCode) {
   const price = product.selling_price ? product.selling_price + ' TL' : '-';
   const variants = product.metas || [];
 
+  // URL Creation
+  const slug = createSlug(name);
+  const productUrl = `https://ugurlar.com/products/${slug}`;
+
   let stockText = "";
   if (variants.length > 0) {
     stockText = "\n\nStok Durumu:\n";
@@ -319,7 +343,7 @@ window.copyProductInfo = function (productCode) {
     });
   }
 
-  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak için WhatsApp hattımızdan bize ulaşabilirsiniz. 👇`;
+  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nÜrünü incelemek ve satın almak için: ${productUrl}\n\nSipariş oluşturmak için WhatsApp hattımızdan bize ulaşabilirsiniz. 👇`;
 
   navigator.clipboard.writeText(text).then(() => {
     alert('Bilgi metni kopyalandı! ✅');
