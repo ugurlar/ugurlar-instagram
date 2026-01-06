@@ -2,6 +2,9 @@
 // HAMURLABS PRODUCT PANEL - APP.JS
 // ===================================
 
+// Global Cache for Products (Veri kaybını önlemek için)
+window.pageProducts = {};
+
 // DOM Elements
 const searchForm = document.getElementById('searchForm');
 const searchInput = document.getElementById('searchInput');
@@ -30,6 +33,8 @@ async function handleSearch(e) {
   }
 
   showLoading();
+  // Cache Temizle
+  window.pageProducts = {};
 
   try {
     const products = await searchProducts(query);
@@ -50,7 +55,6 @@ async function handleSearch(e) {
 // API Functions
 async function searchProducts(query) {
   // Yeni Backend Cache sistemi uzerinden arama yapiyoruz
-  // Backend artik RAM'deki veriyi filtreleyip hizlica sunuyor
   const response = await fetch(`${API_BASE}/api/products/search?code=${encodeURIComponent(query)}`);
 
   if (!response.ok) {
@@ -59,7 +63,6 @@ async function searchProducts(query) {
   }
 
   const data = await response.json();
-  // Backend { total_count: ..., data: [...], from_cache: true } donuyor
   return data.data || data.results || [];
 }
 
@@ -81,26 +84,32 @@ function displayProducts(products, stockData) {
   const productArray = Array.isArray(products) ? products : [products];
   resultCount.textContent = `${productArray.length} ürün bulundu`;
 
-  productList.innerHTML = productArray.map(product => createProductCard(product, stockData)).join('');
+  productList.innerHTML = productArray.map(product => {
+    // Global Cache'e kaydet (Code yoksa rastgele ID ata)
+    const productId = product.code || 'unknown_' + Math.random().toString(36).substr(2, 9);
+    if (!product.code) product.code = productId; // Kod yoksa ata
+
+    // Stock Data'yı product içine merge et ki cache'de dursun
+    const stockInfo = getStockInfo(product, stockData);
+    product.stockInfo = stockInfo;
+
+    // Cache'e at
+    window.pageProducts[productId] = product;
+
+    return createProductCard(product);
+  }).join('');
 
   resultsSection.classList.remove('hidden');
 }
 
-function createProductCard(product, stockData) {
-  const variants = product.variants || [];
-  const stockInfo = getStockInfo(product, stockData);
-
-  // API Verify mapping
+function createProductCard(product) {
+  const code = product.code;
   const brand = product.brand || product.options?.Marka || '-';
   const color = product.options?.['Ana Renk'] || product.color || '-';
   const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
   const price = product.selling_price ? `${product.selling_price} TL` : '-';
   const season = product.options?.['Sezon/Yil'] || '-';
-
-  // Stok ve Beden Bilgisi (metas'dan veya stockData'dan)
-  // Eger metas varsa onlari kullan, yoksa varies yap
   const metaVariants = product.metas || [];
-
   const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : null;
 
   return `
@@ -124,7 +133,7 @@ function createProductCard(product, stockData) {
         <div class="info-grid">
           <div class="info-item">
             <div class="info-label">Ürün Kodu</div>
-            <div class="info-value copy-code" onclick="copyToClipboard('${escapeHtml(product.code)}')" title="Kopyala">${escapeHtml(product.code)}</div>
+            <div class="info-value copy-code" onclick="copyToClipboard('${escapeHtml(code)}')" title="Kopyala">${escapeHtml(code)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Barkod</div>
@@ -144,29 +153,17 @@ function createProductCard(product, stockData) {
           </div>
         </div>
         
-        ${createStockTable(metaVariants, stockInfo)}
+        ${createStockTable(metaVariants, product.stockInfo)}
 
         <div class="action-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
             <button 
-                data-name="${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}"
-                data-code="${escapeHtml(product.code || product.sku || '-')}"
-                data-brand="${escapeHtml(brand)}"
-                data-color="${escapeHtml(color)}"
-                data-price="${price}"
-                data-variants="${escapeHtml(JSON.stringify(metaVariants))}"
-                onclick="copyProductInfo(this)" 
+                onclick="copyProductInfo('${escapeHtml(code)}')" 
                 class="copy-btn" 
                 style="flex: 1; padding: 10px; background: #eee; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
                 📋 Bilgi Metni Kopyala
             </button>
             <button 
-                data-name="${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}"
-                data-brand="${escapeHtml(brand)}"
-                data-color="${escapeHtml(color)}"
-                data-price="${price}"
-                data-category="${escapeHtml(category)}"
-                data-variants="${escapeHtml(JSON.stringify(metaVariants))}"
-                onclick="generateAIText(this)" 
+                onclick="generateAIText('${escapeHtml(code)}')" 
                 class="ai-btn" 
                 style="flex: 1; padding: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px;">
                 ✨ AI ile Satış Metni Yaz
@@ -177,30 +174,33 @@ function createProductCard(product, stockData) {
   `;
 }
 
-// Global scope AI function
-window.generateAIText = async function (btn) {
-  const name = btn.dataset.name;
-  const brand = btn.dataset.brand;
-  const color = btn.dataset.color;
-  const price = btn.dataset.price;
-  const category = btn.dataset.category;
-
-  let variants = [];
-  try {
-    variants = JSON.parse(btn.dataset.variants || '[]');
-  } catch (e) {
-    console.error('JSON Parse Error:', e);
+// Global scope AI function - REFACTOR: Uses Global Cache
+window.generateAIText = async function (productCode) {
+  const product = window.pageProducts[productCode];
+  if (!product) {
+    alert('Hata: Ürün verisi bulunamadı.');
+    return;
   }
+
+  const name = product.name || product.title;
+  const brand = product.brand || product.options?.Marka || '-';
+  const color = product.options?.['Ana Renk'] || product.color || '-';
+  const price = product.selling_price;
+  const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
+  const variants = product.metas || [];
 
   // Stok Durumunu Analiz Et
   let stockStatus = "Tükendi";
   let availableSizes = [];
 
   if (variants.length > 0) {
-    availableSizes = variants.filter(v => (v.quantity || 0) > 0).map(v => v.value || v.size || v.name);
+    // Quantity kontrolü: Sayısal değere çevir ve 0'dan büyük mü bak
+    availableSizes = variants.filter(v => (parseInt(v.quantity) || 0) > 0).map(v => v.value || v.size || v.name);
     if (availableSizes.length > 0) {
       stockStatus = `Stokta Var (${availableSizes.join(', ')})`;
     }
+  } else if (product.stockInfo && (product.stockInfo.quantity > 0)) {
+    stockStatus = "Stokta Var"; // Varyantsız ama global stok var
   }
 
   const loadingId = 'ai-loading-' + Date.now();
@@ -224,13 +224,9 @@ window.generateAIText = async function (btn) {
     });
 
     const data = await response.json();
-
-    // Remove loading
     document.body.removeChild(overlay);
 
     if (!response.ok) throw new Error(data.error || 'AI hatası');
-
-    // Show result in a nice modal
     showAIResult(data.text);
 
   } catch (error) {
@@ -241,7 +237,6 @@ window.generateAIText = async function (btn) {
 
 function showAIResult(text) {
   const modalId = 'ai-result-modal';
-  // Remove if exists
   const existing = document.getElementById(modalId);
   if (existing) document.body.removeChild(existing);
 
@@ -271,7 +266,6 @@ function showAIResult(text) {
 }
 
 function createStockTable(variants, stockInfo) {
-  // Eger variants (metas) varsa onlari goster
   if (variants && variants.length > 0) {
     return `
     <div class="stock-section">
@@ -289,7 +283,7 @@ function createStockTable(variants, stockInfo) {
             <tr>
               <td>${escapeHtml(v.value || v.size || v.name || '-')}</td>
               <td>${escapeHtml(v.barcode || '-')}</td>
-              <td class="${(v.quantity || 0) > 0 ? 'text-green' : 'text-red'}">
+              <td class="${(parseInt(v.quantity) || 0) > 0 ? 'text-green' : 'text-red'}">
                 ${v.quantity !== undefined ? v.quantity : '-'} 
               </td>
             </tr>
@@ -299,41 +293,33 @@ function createStockTable(variants, stockInfo) {
     </div>
   `;
   }
-
-  // Eski yontem (stockInfo'dan)
-  if (stockInfo && Object.keys(stockInfo).length > 0) {
-    // ... (Eski kod buradaydi ama metas varken buna gerek kalmayabilir)
-    return '';
-  }
-
   return '<div class="no-stock-info">Detaylı stok bilgisi yok</div>';
 }
 
-// Global scope copy function
-window.copyProductInfo = function (btn) {
-  const name = btn.dataset.name;
-  const code = btn.dataset.code;
-  const brand = btn.dataset.brand;
-  const color = btn.dataset.color;
-  const price = btn.dataset.price;
-
-  let variants = [];
-  try {
-    variants = JSON.parse(btn.dataset.variants || '[]');
-  } catch (e) {
-    console.error('JSON Parse Error:', e);
+// Global scope copy function - REFACTOR: Uses Global Cache
+window.copyProductInfo = function (productCode) {
+  const product = window.pageProducts[productCode];
+  if (!product) {
+    alert('Hata: Ürün verisi bulunamadı.');
+    return;
   }
+
+  const name = product.name || product.title;
+  const brand = product.brand || product.options?.Marka || '-';
+  const color = product.options?.['Ana Renk'] || product.color || '-';
+  const price = product.selling_price ? product.selling_price + ' TL' : '-';
+  const variants = product.metas || [];
 
   let stockText = "";
   if (variants.length > 0) {
     stockText = "\n\nStok Durumu:\n";
     variants.forEach(v => {
-      const qty = v.quantity || 0;
+      const qty = parseInt(v.quantity) || 0;
       stockText += `${v.value || v.size || v.name}: ${qty > 0 ? qty + ' Adet' : 'Tükendi'}\n`;
     });
   }
 
-  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${code}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak ister misiniz?`;
+  const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nSipariş oluşturmak ister misiniz?`;
 
   navigator.clipboard.writeText(text).then(() => {
     alert('Bilgi metni kopyalandı! ✅');
@@ -342,27 +328,19 @@ window.copyProductInfo = function (btn) {
 
 function getStockInfo(product, stockData) {
   if (!stockData || !Array.isArray(stockData)) return {};
-
-  // Try to find stock info by barcode or product id
   const found = stockData.find(s =>
     s.barcode === product.barcode ||
     s.product_id === product.id ||
     s.sku === product.code
   );
-
   return found || {};
 }
 
 function getStockBadge(quantity) {
   const qty = parseInt(quantity) || 0;
-
-  if (qty <= 0) {
-    return '<span class="stock-badge out-of-stock">Stokta Yok</span>';
-  } else if (qty <= 5) {
-    return '<span class="stock-badge low-stock">Az Stok</span>';
-  } else {
-    return '<span class="stock-badge in-stock">Stokta</span>';
-  }
+  if (qty <= 0) return '<span class="stock-badge out-of-stock">Stokta Yok</span>';
+  if (qty <= 5) return '<span class="stock-badge low-stock">Az Stok</span>';
+  return '<span class="stock-badge in-stock">Stokta</span>';
 }
 
 // UI State Functions
@@ -389,7 +367,7 @@ function hideAll() {
   emptyState.classList.add('hidden');
 }
 
-// System Status Logic (Added in separate chunk effectively merged above due to full rewrite)
+// System Status Logic
 document.addEventListener('DOMContentLoaded', () => {
   const btnStatus = document.getElementById('btn-system-status');
   if (btnStatus) {
@@ -402,7 +380,6 @@ async function showSystemStatus() {
   const existing = document.getElementById(modalId);
   if (existing) document.body.removeChild(existing);
 
-  // Loading Modal
   const modal = document.createElement('div');
   modal.id = modalId;
   modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; justify-content: center; align-items: center;';
@@ -419,7 +396,6 @@ async function showSystemStatus() {
   try {
     const response = await fetch(`${API_BASE}/api/system-status`);
     const logs = await response.json();
-
     const contentDiv = document.getElementById('status-content');
 
     if (logs && logs.length > 0) {
@@ -467,10 +443,9 @@ function escapeHtml(text) {
 // Utility: Copy Code
 window.copyToClipboard = function (text) {
   navigator.clipboard.writeText(text).then(() => {
-    // Optional: show tooltip
     console.log('Copied');
   }).catch(err => console.error('Copy failed', err));
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel loaded');
+console.log('🚀 Hamurlabs Product Panel loaded with Global Cache');
