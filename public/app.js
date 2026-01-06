@@ -235,7 +235,7 @@ function createStockTable(variants, stockInfo) {
         <tbody>
           ${variants.map(v => `
             <tr>
-              <td>${escapeHtml(v.name || v.value || v.size || '-')}</td>
+              <td>${escapeHtml(v.value || v.size || v.name || '-')}</td>
               <td>${escapeHtml(v.barcode || '-')}</td>
               <td class="${(v.quantity || 0) > 0 ? 'text-green' : 'text-red'}">
                 ${v.quantity !== undefined ? v.quantity : '-'} 
