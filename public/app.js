@@ -101,14 +101,25 @@ function createProductCard(product, stockData) {
   // Eger metas varsa onlari kullan, yoksa varies yap
   const metaVariants = product.metas || [];
 
+  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : null;
+
   return `
     <article class="product-card">
       <div class="product-header">
-        <div>
-            <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
-            <span class="product-code">${escapeHtml(product.code || product.sku || '-')}</span>
+        <div class="product-image-container">
+          ${imageUrl
+      ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'product-image-placeholder\\'>📷</div>'">`
+      : '<div class="product-image-placeholder">📷</div>'
+    }
         </div>
-        <div class="product-price">${price}</div>
+        
+        <div class="product-header-content">
+          <div>
+              <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
+              <span class="product-code">${escapeHtml(product.code || product.sku || '-')}</span>
+          </div>
+          <div class="product-price">${price}</div>
+        </div>
       </div>
       
       <div class="product-body">
