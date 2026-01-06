@@ -282,34 +282,50 @@ app.get('/api/shopify-product', async (req, res) => {
 // 4. AI Metin Üretimi (Gelişmiş Fallback Mekanizması)
 app.post('/api/generate-text', async (req, res) => {
   try {
-    const { product } = req.body;
+    const { product, products } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
 
     if (!apiKey) return res.status(500).json({ error: 'API Key eksik' });
 
+    // Handle single or multiple products
+    const productList = products || (product ? [product] : []);
+
+    if (productList.length === 0) {
+      return res.status(400).json({ error: 'Ürün bilgisi gerekli' });
+    }
+
+    let productDetails = '';
+    productList.forEach((p, index) => {
+      productDetails += `
+    --- Ürün ${index + 1} ---
+    - Ürün Adı: ${p.name}
+    - Marka: ${p.brand}
+    - Renk: ${p.color}
+    - Fiyat: ${p.price}
+    - Stok Durumu: ${p.stockStatus}
+    - Mevcut Bedenler: ${p.sizes || '-'}
+    - Kategori: ${p.category}
+    - Ürün Linki: ${p.url}
+        `;
+    });
+
     const prompt = `
       Sen profesyonel bir butik/mağaza satış danışmanısın. Müşteriye Instagram DM üzerinden gönderilecek bir yanıt hazırlıyorsun.
+      Müşteri ${productList.length > 1 ? 'birden fazla ürün' : 'bir ürün'} hakkında bilgi istedi.
       
       Ürün Bilgileri:
-    - Ürün Adı: ${product.name}
-    - Marka: ${product.brand}
-    - Renk: ${product.color}
-    - Fiyat: ${product.price}
-    - Stok Durumu: ${product.stockStatus}
-    - Mevcut Bedenler: ${product.sizes || '-'}
-    - Kategori: ${product.category}
-    - Ürün Linki: ${product.url}
-
-    Kurallar:
-    1. ** Ton:** Samimi ama profesyonel ol. (Çok "cıvık" olma, "canım", "aşkım" gibi kelimeler kullanma. "Hanımefendi" de deme. "Merhabalar", "Selamlar" gibi sıcak ama saygılı bir giriş yap.)
-    2. ** Stok Kontrolü(ÇOK ÖNEMLİ):**
-      - Eğer "Stok Durumu" içinde "Var" veya bedenler geçiyorsa, ** ASLA "Tükendi" deme **.Müşteriyi satın almaya yönlendir.
-         - Eğer "Tükendi" yazıyorsa, nazikçe stokların bittiğini belirt ve benzer ürünlere yönlendir veya gelince haber verelim de.
-      3. ** İçerik:** Ürünün markasını ve rengini vurgula.Fiyatın uygunluğunu veya kalitesini öv.
-      4. ** Kapanış:** Sorularını sorma, direkt eyleme geçir: "Sipariş oluşturmak ve detaylı bilgi almak için bize WhatsApp hattımızdan ulaşabilirsiniz." diyerek yönlendir. Telefon numarası verme, sadece yönlendir.
-         - **ÖNEMLİ:** Mesajın en sonuna veya uygun bir yerine mutlaka ürünün web sitesindeki linkini (${product.url}) de ekle. "Ürünü web sitemizden incelemek için: [Link]" gibi.
-      5. ** Emojiler:** Az ve öz kullan(✨, 👗, 🌸).Boğuculuğa kaçma.
-      6. ** Kısa ve Net Ol:** Müşteri telefondan okuyor, destan yazma.
+      ${productDetails}
+      
+      KURALLAR (KESİNLİKLE UY):
+      1. MAKSİMUM 600 KARAKTER kullan. (Çok önemli, Instagram mesaj sınırını aşma).
+      2. MARKDOWN YILDIZ (*) ASLA KULLANMA. Kalın yazmak için önemli yerleri BÜYÜK HARFLE yaz veya emoji ile vurgula.
+      3. Tonun samimi ve enerjik olsun ("Selamlar", "Harika seçim" vb.)
+      4. "Tükendi" deme, "Stoklar güncelleniyor" veya "Alternatiflerimize göz at" de.
+      5. Her ürünün linkini mesajın en sonuna ekle:
+         "👇 Ürünleri İncele:
+         [Ürün Adı]: [Link]"
+      6. Paragraf yazma, kısa ve net cümleler kur.
+      7. Fiyat bilgisini net ver.
     `;
 
     // Denenecek modeller listesi (Biri çalışmazsa diğerine geç)

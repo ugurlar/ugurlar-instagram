@@ -16,33 +16,80 @@ const productList = document.getElementById('productList');
 const resultCount = document.getElementById('resultCount');
 const emptyState = document.getElementById('emptyState');
 
+// Sidebar Elements
+const historySidebar = document.getElementById('historySidebar');
+const toggleSidebarBtn = document.getElementById('toggleSidebar');
+const closeSidebarBtn = document.getElementById('closeSidebar');
+const sidebarContent = document.getElementById('sidebarContent');
+
 // API Base URL
 const API_BASE = '';
 
 // Event Listeners
+// Event Listeners
 searchForm.addEventListener('submit', handleSearch);
 
+// Sidebar Toggles
+if (toggleSidebarBtn) {
+  toggleSidebarBtn.addEventListener('click', () => {
+    historySidebar.classList.add('open');
+  });
+}
+if (closeSidebarBtn) {
+  closeSidebarBtn.addEventListener('click', () => {
+    historySidebar.classList.remove('open');
+  });
+}
+
+// Close sidebar when clicking outside
+document.addEventListener('click', (e) => {
+  if (historySidebar.classList.contains('open') &&
+    !historySidebar.contains(e.target) &&
+    !toggleSidebarBtn.contains(e.target)) {
+    historySidebar.classList.remove('open');
+  }
+});
+
+// Search Handler
 // Search Handler
 async function handleSearch(e) {
   e.preventDefault();
-  const query = searchInput.value.trim();
+  const rawQuery = searchInput.value.trim();
 
-  if (!query) {
+  if (!rawQuery) {
     showError('Lütfen ürün kodu veya barkod girin');
     return;
   }
 
+  // Multi-search: Split by space, comma or newline
+  const queries = rawQuery.split(/[\s,]+/).filter(Boolean);
+
   showLoading();
   // Cache Temizle
   window.pageProducts = {};
+  window.currentResultCodes = []; // Store current results
 
   try {
-    const products = await searchProducts(query);
+    let allProducts = [];
 
-    if (products && products.length > 0) {
+    // Parallel fetch for all queries
+    const results = await Promise.all(
+      queries.map(q => searchProducts(q))
+    );
+
+    // Flatten and Deduplicate
+    const seen = new Set();
+    results.flat().forEach(p => {
+      if (!seen.has(p.code)) {
+        seen.add(p.code);
+        allProducts.push(p);
+      }
+    });
+
+    if (allProducts.length > 0) {
       // Fetch stock info for products
       const stockData = await fetchStock();
-      displayProducts(products, stockData);
+      displayProducts(allProducts, stockData);
     } else {
       showNoResults();
     }
@@ -78,13 +125,31 @@ async function fetchStock() {
 }
 
 // Display Functions
+// Display Functions
 function displayProducts(products, stockData) {
   hideAll();
+  // recentProductsSection removed from main view
+
   productList.innerHTML = '';
 
   const productArray = Array.isArray(products) ? products : [products];
   resultCount.textContent = `${productArray.length} ürün bulundu`;
   resultsSection.classList.remove('hidden');
+
+  // Store codes for Combined AI
+  window.currentResultCodes = productArray.map(p => p.code);
+
+  // Show Combined AI Button if multiple products
+  if (productArray.length > 1) {
+    const combinedBtn = `
+        <div class="fade-in-up" style="display: flex; justify-content: center; margin-bottom: 2rem;">
+            <button onclick="generateCombinedAIText()" class="btn-premium btn-ai-magic" style="width: auto; padding: 1rem 2rem;">
+                ✨ ${productArray.length} Ürün İçin Ortak Metin Oluştur
+            </button>
+        </div>
+      `;
+    productList.insertAdjacentHTML('beforeend', combinedBtn);
+  }
 
   productArray.forEach((product, index) => {
     // Global Cache'e kaydet (Code yoksa rastgele ID ata)
@@ -355,6 +420,140 @@ function showAIResult(text) {
   document.body.appendChild(modal);
 }
 
+// Combined AI Generator
+window.generateCombinedAIText = async function () {
+  const codes = window.currentResultCodes || [];
+  if (codes.length === 0) return;
+
+  const productsToProcess = codes.map(code => window.pageProducts[code]).filter(Boolean);
+
+  if (productsToProcess.length === 0) {
+    showToast('Ürün verisi bulunamadı', 'error');
+    return;
+  }
+
+  // Prepare data for AI
+  const preparedProducts = await Promise.all(productsToProcess.map(async (product) => {
+    const name = product.name || product.title;
+    const brand = product.brand || product.options?.Marka || '-';
+    const color = product.options?.['Ana Renk'] || product.color || '-';
+    const price = product.selling_price;
+    const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
+    const variants = product.metas || [];
+
+    // URL Creation
+    const url = await fetchProductUrl(product.code, name);
+
+    // Stock Status
+    let stockStatus = "Tükendi";
+    let availableSizes = [];
+    if (variants.length > 0) {
+      availableSizes = variants.filter(v => (parseInt(v.quantity) || 0) > 0).map(v => v.value || v.size || v.name);
+      if (availableSizes.length > 0) stockStatus = `Stokta Var (${availableSizes.join(', ')})`;
+    } else if (product.stockInfo && (product.stockInfo.quantity > 0)) {
+      stockStatus = "Stokta Var";
+    }
+
+    return { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', '), url };
+  }));
+
+  const loadingId = 'ai-loading-' + Date.now();
+  const overlay = document.createElement('div');
+  overlay.id = loadingId;
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white;';
+  overlay.innerHTML = `
+        <div style="font-size: 40px; margin-bottom: 20px;">✨</div>
+        <h3>Toplu Metin Hazırlanıyor...</h3>
+        <p>${preparedProducts.length} ürün analiz ediliyor.</p>
+    `;
+  document.body.appendChild(overlay);
+
+  try {
+    const response = await fetch(`${API_BASE}/api/generate-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: preparedProducts })
+    });
+
+    const data = await response.json();
+    document.body.removeChild(overlay);
+
+    if (!response.ok) throw new Error(data.error || 'AI hatası');
+    showAIResult(data.text);
+
+  } catch (error) {
+    if (document.getElementById(loadingId)) document.body.removeChild(document.getElementById(loadingId));
+    showToast('Hata: ' + error.message, 'error');
+  }
+}
+
+// Combined AI Generator
+window.generateCombinedAIText = async function () {
+  const codes = window.currentResultCodes || [];
+  if (codes.length === 0) return;
+
+  const productsToProcess = codes.map(code => window.pageProducts[code]).filter(Boolean);
+
+  if (productsToProcess.length === 0) {
+    showToast('Ürün verisi bulunamadı', 'error');
+    return;
+  }
+
+  // Prepare data for AI
+  const preparedProducts = await Promise.all(productsToProcess.map(async (product) => {
+    const name = product.name || product.title;
+    const brand = product.brand || product.options?.Marka || '-';
+    const color = product.options?.['Ana Renk'] || product.color || '-';
+    const price = product.selling_price;
+    const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
+    const variants = product.metas || [];
+
+    // URL Creation
+    const url = await fetchProductUrl(product.code, name);
+
+    // Stock Status
+    let stockStatus = "Tükendi";
+    let availableSizes = [];
+    if (variants.length > 0) {
+      availableSizes = variants.filter(v => (parseInt(v.quantity) || 0) > 0).map(v => v.value || v.size || v.name);
+      if (availableSizes.length > 0) stockStatus = `Stokta Var (${availableSizes.join(', ')})`;
+    } else if (product.stockInfo && (product.stockInfo.quantity > 0)) {
+      stockStatus = "Stokta Var";
+    }
+
+    return { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', '), url };
+  }));
+
+  const loadingId = 'ai-loading-' + Date.now();
+  const overlay = document.createElement('div');
+  overlay.id = loadingId;
+  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white;';
+  overlay.innerHTML = `
+        <div style="font-size: 40px; margin-bottom: 20px;">✨</div>
+        <h3>Toplu Metin Hazırlanıyor...</h3>
+        <p>${preparedProducts.length} ürün analiz ediliyor.</p>
+    `;
+  document.body.appendChild(overlay);
+
+  try {
+    const response = await fetch(`${API_BASE}/api/generate-text`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: preparedProducts })
+    });
+
+    const data = await response.json();
+    document.body.removeChild(overlay);
+
+    if (!response.ok) throw new Error(data.error || 'AI hatası');
+    showAIResult(data.text);
+
+  } catch (error) {
+    if (document.getElementById(loadingId)) document.body.removeChild(document.getElementById(loadingId));
+    showToast('Hata: ' + error.message, 'error');
+  }
+}
+
 function createStockTable(variants, stockInfo) {
   if (variants && variants.length > 0) {
     return `
@@ -520,6 +719,108 @@ function hideAll() {
   errorEl.classList.add('hidden');
   resultsSection.classList.add('hidden');
   emptyState.classList.add('hidden');
+  // Do NOT hide recentProductsSection here by default, let individual functions manage it
+}
+
+// Recent Products Logic
+async function fetchRecentProducts() {
+  try {
+    const response = await fetch(`${API_BASE}/api/products?limit=10`);
+    if (!response.ok) throw new Error('Failed to fetch recent products');
+
+    const data = await response.json();
+    const products = data.data || [];
+
+    if (products.length > 0) {
+      const stockData = await fetchStock();
+      renderRecentProducts(products, stockData);
+    }
+  } catch (error) {
+    console.error('Recent products fetch error:', error);
+  }
+}
+
+function renderRecentProducts(products, stockData) {
+  const container = sidebarContent;
+  container.innerHTML = '';
+
+  if (!products || products.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:1rem;">Henüz güncelleme yok</div>';
+    return;
+  }
+
+  products.forEach((product) => {
+    // Global Cache
+    const productId = product.code || 'unknown_' + Math.random().toString(36).substr(2, 9);
+    if (!product.code) product.code = productId;
+
+    // Merge Stock
+    product.stockInfo = getStockInfo(product, stockData);
+    window.pageProducts[productId] = product;
+
+    // Create compact card
+    const cardHtml = createCompactProductCard(product);
+    container.insertAdjacentHTML('beforeend', cardHtml);
+  });
+}
+
+function createCompactProductCard(product) {
+  const code = product.code;
+  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : null;
+  const price = product.selling_price ? `${product.selling_price} TL` : '-';
+
+  // Stock Status Badge
+  let stockBadge = '<span style="color:var(--error); font-size: 0.7em;">Tükendi</span>';
+  const variants = product.metas || [];
+  let totalStock = 0;
+
+  if (variants.length > 0) {
+    totalStock = variants.reduce((acc, v) => acc + (parseInt(v.quantity) || 0), 0);
+  } else if (product.stockInfo && product.stockInfo.quantity) {
+    totalStock = parseInt(product.stockInfo.quantity);
+  }
+
+  if (totalStock > 0) {
+    stockBadge = `<span style="color:var(--success); font-size: 0.7em;">${totalStock} Adet</span>`;
+  }
+
+  return `
+    <div class="sidebar-item" onclick="handleSearchFromSidebar('${escapeHtml(code)}')">
+      <div class="sidebar-item-img">
+         ${imageUrl
+      ? `<img src="${imageUrl}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'small-placeholder\\'><svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\' /></svg></div>';">`
+      : `<div class="small-placeholder">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+               </div>`
+    }
+      </div>
+      <div class="sidebar-item-info">
+        <div class="sidebar-item-title">${escapeHtml(product.name)}</div>
+        <div class="sidebar-item-meta">
+           <span style="font-family:monospace;">${escapeHtml(code)}</span>
+           ${stockBadge}
+        </div>
+        <div class="sidebar-item-price">${price}</div>
+      </div>
+    </div>
+  `;
+}
+
+function handleSearchFromSidebar(code) {
+  const searchInput = document.getElementById('searchInput');
+  if (searchInput) {
+    searchInput.value = code;
+    const form = document.getElementById('searchForm');
+    if (form) form.dispatchEvent(new Event('submit'));
+
+    // Close sidebar on mobile
+    if (window.innerWidth < 768) {
+      const sidebar = document.getElementById('historySidebar');
+      if (sidebar) sidebar.classList.remove('open');
+    }
+  }
 }
 
 // System Status Logic
@@ -528,6 +829,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnStatus) {
     btnStatus.addEventListener('click', showSystemStatus);
   }
+
+  // Load recent products
+  fetchRecentProducts();
 });
 
 async function showSystemStatus() {

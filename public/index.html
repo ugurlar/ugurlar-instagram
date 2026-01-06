@@ -29,7 +29,12 @@
           <h1>Ugurlar İnstagram Envanter Paneli</h1>
         </div>
         <div class="header-info">
-          <span class="badge">v1.0</span>
+          <button id="toggleSidebar" class="btn-icon" title="Geçmiş / Güncellemeler">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          <span class="badge">v1.1</span>
         </div>
       </div>
     </header>
@@ -99,6 +104,17 @@
 
     <!-- Toast Container -->
     <div id="toast-container"></div>
+
+    <!-- Sidebar -->
+    <aside id="historySidebar" class="sidebar">
+      <div class="sidebar-header">
+        <h3>🔥 Son Güncellemeler</h3>
+        <button id="closeSidebar" class="btn-icon-small">✕</button>
+      </div>
+      <div id="sidebarContent" class="sidebar-content">
+        <!-- Compact Items will be injected here -->
+      </div>
+    </aside>
   </div>
 
   <script src="app.js"></script>
