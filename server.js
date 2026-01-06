@@ -223,9 +223,10 @@ async function getShopifyProductHandle(sku) {
     return null;
   }
 
+  // General query works better than sku: prefix because Shopify SKUs contain size suffixes
   const query = `
     {
-      products(first: 1, query: "sku:${sku}") {
+      products(first: 1, query: "${sku}") {
         edges {
           node {
             handle
