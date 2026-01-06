@@ -189,10 +189,8 @@ window.generateAIText = async function (productCode) {
   const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
   const variants = product.metas || [];
 
-  // URL Creation
-  const slug = createSlug(name);
-  // Shopify URL Genellikle: /products/urun-adi formundadir
-  const productUrl = `https://ugurlar.com/products/${slug}`;
+  // URL Creation (Async)
+  const productUrl = await fetchProductUrl(productCode, name);
 
   // Stok Durumunu Analiz Et
   let stockStatus = "Tükendi";
@@ -316,8 +314,25 @@ function createSlug(text) {
     .replace(/\s+/g, '-'); // Replace spaces with -
 }
 
+// Utility: Get Product URL from Backend (Shopify API)
+async function fetchProductUrl(productCode, productName) {
+  try {
+    const response = await fetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(productCode)}`);
+    const data = await response.json();
+    if (data.found && data.url) {
+      return data.url;
+    }
+  } catch (e) {
+    console.error('Link fetch error:', e);
+  }
+
+  // Fallback to slugify if API fails
+  const slug = createSlug(productName);
+  return `https://ugurlar.com/products/${slug}`;
+}
+
 // Global scope copy function - REFACTOR: Uses Global Cache
-window.copyProductInfo = function (productCode) {
+window.copyProductInfo = async function (productCode) {
   const product = window.pageProducts[productCode];
   if (!product) {
     alert('Hata: Ürün verisi bulunamadı.');
@@ -330,9 +345,8 @@ window.copyProductInfo = function (productCode) {
   const price = product.selling_price ? product.selling_price + ' TL' : '-';
   const variants = product.metas || [];
 
-  // URL Creation
-  const slug = createSlug(name);
-  const productUrl = `https://ugurlar.com/products/${slug}`;
+  // URL Creation (Async)
+  const productUrl = await fetchProductUrl(productCode, name);
 
   let stockText = "";
   if (variants.length > 0) {

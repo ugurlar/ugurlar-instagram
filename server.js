@@ -211,6 +211,73 @@ app.get('/api/stock', async (req, res) => {
   }
 });
 
+// ==========================================
+// SHOPIFY INTEGRATION
+// ==========================================
+const SHOPIFY_DOMAIN = process.env.SHOPIFY_STORE_DOMAIN; // e.g., 'ugurlar.myshopify.com'
+const SHOPIFY_TOKEN = process.env.SHOPIFY_ACCESS_TOKEN;
+
+async function getShopifyProductHandle(sku) {
+  if (!SHOPIFY_DOMAIN || !SHOPIFY_TOKEN) {
+    console.warn('⚠️ Shopify Credentials eksik.');
+    return null;
+  }
+
+  const query = `
+    {
+      products(first: 1, query: "sku:${sku}") {
+        edges {
+          node {
+            handle
+            onlineStoreUrl
+          }
+        }
+      }
+    }
+  `;
+
+  try {
+    const response = await axios.post(
+      `https://${SHOPIFY_DOMAIN}/admin/api/2024-01/graphql.json`,
+      { query },
+      {
+        headers: {
+          'X-Shopify-Access-Token': SHOPIFY_TOKEN,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const edges = response.data?.data?.products?.edges;
+    if (edges && edges.length > 0) {
+      return edges[0].node;
+    }
+    return null;
+  } catch (error) {
+    console.error('Shopify API Error:', error.message);
+    return null;
+  }
+}
+
+// 3.5 Shopify Product Link Endpoint
+app.get('/api/shopify-product', async (req, res) => {
+  const { code } = req.query;
+  if (!code) return res.status(400).json({ error: 'Urun kodu gerekli' });
+
+  // Onbellek veya veritabanindan hizlica bulabilirsek harika olur ama
+  // simdilik canli soralim.
+  const shopifyData = await getShopifyProductHandle(code);
+
+  if (shopifyData) {
+    // Eger onlineStoreUrl varsa onu kullan, yoksa handle ile biz olusturalim
+    const url = shopifyData.onlineStoreUrl || `https://ugurlar.com/products/${shopifyData.handle}`;
+    res.json({ url, handle: shopifyData.handle, found: true });
+  } else {
+    // Bulamazsak fallback olarak slugify mantigi veya bos donelim
+    res.json({ found: false, error: 'Shopify\'da bulunamadi' });
+  }
+});
+
 // 4. AI Metin Üretimi (Gelişmiş Fallback Mekanizması)
 app.post('/api/generate-text', async (req, res) => {
   try {
