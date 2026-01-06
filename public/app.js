@@ -80,54 +80,69 @@ async function fetchStock() {
 // Display Functions
 function displayProducts(products, stockData) {
   hideAll();
+  productList.innerHTML = '';
 
   const productArray = Array.isArray(products) ? products : [products];
   resultCount.textContent = `${productArray.length} ürün bulundu`;
-
-  productList.innerHTML = productArray.map(product => {
-    // Global Cache'e kaydet (Code yoksa rastgele ID ata)
-    const productId = product.code || 'unknown_' + Math.random().toString(36).substr(2, 9);
-    if (!product.code) product.code = productId; // Kod yoksa ata
-
-    // Stock Data'yı product içine merge et ki cache'de dursun
-    const stockInfo = getStockInfo(product, stockData);
-    product.stockInfo = stockInfo;
-
-    // Cache'e at
-    window.pageProducts[productId] = product;
-
-    return createProductCard(product);
-  }).join('');
-
   resultsSection.classList.remove('hidden');
 
-  // Shopify linklerini ve durumlarını yükle
+  productArray.forEach((product, index) => {
+    // Global Cache'e kaydet (Code yoksa rastgele ID ata)
+    const productId = product.code || 'unknown_' + Math.random().toString(36).substr(2, 9);
+    if (!product.code) product.code = productId;
+
+    // Stock Data'yı merge et
+    product.stockInfo = getStockInfo(product, stockData);
+    window.pageProducts[productId] = product;
+
+    const cardHtml = createProductCard(product, index);
+    productList.insertAdjacentHTML('beforeend', cardHtml);
+  });
+
+  // Shopify linklerini yükle
   loadShopifyStatus(productArray);
 }
 
-function createProductCard(product) {
+function createProductCard(product, index = 0) {
   const code = product.code;
   const brand = product.brand || product.options?.Marka || '-';
   const color = product.options?.['Ana Renk'] || product.color || '-';
-  const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
   const price = product.selling_price ? `${product.selling_price} TL` : '-';
   const season = product.options?.['Sezon/Yil'] || '-';
   const metaVariants = product.metas || [];
   const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : null;
 
+  // Stagger animation delay
+  const delay = index * 0.1;
+
   return `
-    <article class="product-card">
+    <article class="product-card fade-in-up" style="animation-delay: ${delay}s">
+      <div class="shopify-top-badge" id="shopify-badge-${escapeHtml(code)}">
+        <!-- Will be populated by loadShopifyStatus -->
+      </div>
+
       <div class="product-header">
         <div class="product-header-content">
              <div class="product-image-container">
                 ${imageUrl
-      ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" loading="lazy">`
-      : '<div class="product-image-placeholder">📷</div>'
+      ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'product-image-placeholder\\'><svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\' /></svg><span>Görsel Yok</span></div>';">`
+      : `<div class="product-image-placeholder">
+           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+           </svg>
+           <span>Görsel Yok</span>
+         </div>`
     }
              </div>
              <div class="product-title-group">
                 <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
                 <div class="product-price">${price}</div>
+                
+                <div class="shopify-action-group" id="shopify-action-${escapeHtml(code)}">
+                    <button class="btn-premium btn-shopify" disabled>
+                       <span class="status-dot status-loading"></span> Kontrol...
+                    </button>
+                </div>
              </div>
         </div>
       </div>
@@ -137,10 +152,6 @@ function createProductCard(product) {
           <div class="info-item">
             <div class="info-label">Ürün Kodu</div>
             <div class="info-value copy-code" onclick="copyToClipboard('${escapeHtml(code)}')" title="Kopyala">${escapeHtml(code)}</div>
-          </div>
-          <div class="info-item">
-            <div class="info-label">Barkod</div>
-            <div class="info-value">${escapeHtml(product.barcode)}</div>
           </div>
           <div class="info-item">
             <div class="info-label">Marka</div>
@@ -154,29 +165,16 @@ function createProductCard(product) {
             <div class="info-label">Sezon</div>
             <div class="info-value">${escapeHtml(season)}</div>
           </div>
-          <div class="info-item shopify-link-container" id="shopify-link-${escapeHtml(code)}">
-            <div class="info-label">Shopify Link</div>
-            <div class="info-value">
-              <span class="status-dot status-loading"></span>
-              <span class="status-text">Kontrol ediliyor...</span>
-            </div>
-          </div>
         </div>
         
         ${createStockTable(metaVariants, product.stockInfo)}
 
-        <div class="action-buttons" style="margin-top: 15px; display: flex; gap: 10px;">
-            <button 
-                onclick="copyProductInfo('${escapeHtml(code)}')" 
-                class="copy-btn" 
-                style="flex: 1; padding: 10px; background: #eee; border: none; border-radius: 4px; cursor: pointer; font-weight: 500;">
-                📋 Bilgi Metni Kopyala
+        <div class="action-buttons">
+            <button onclick="generateAIText('${escapeHtml(code)}')" class="btn-premium btn-ai-magic">
+                ✨ Yapay Zeka ile Açıklama Oluştur
             </button>
-            <button 
-                onclick="generateAIText('${escapeHtml(code)}')" 
-                class="ai-btn" 
-                style="flex: 1; padding: 10px; background: linear-gradient(135deg, #6366f1, #a855f7); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 500; display: flex; align-items: center; justify-content: center; gap: 5px;">
-                ✨ AI ile Satış Metni Yaz
+            <button onclick="copyProductInfo('${escapeHtml(code)}')" class="btn-premium btn-copy-info">
+                📋 Ürün Bilgilerini Kopyala
             </button>
         </div>
       </div>
@@ -188,44 +186,86 @@ function createProductCard(product) {
 async function loadShopifyStatus(products) {
   for (const product of products) {
     const code = product.code;
-    const container = document.getElementById(`shopify-link-${code}`);
-    if (!container) continue;
+    const badgeContainer = document.getElementById(`shopify-badge-${code}`);
+    const actionContainer = document.getElementById(`shopify-action-${code}`);
+    if (!badgeContainer || !actionContainer) continue;
 
     try {
       const response = await fetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(code)}`);
       const data = await response.json();
 
-      const valueDiv = container.querySelector('.info-value');
-
       if (data.found && data.url) {
-        valueDiv.innerHTML = `
-          <a href="${data.url}" target="_blank" class="shopify-url-link">
-            <span class="status-dot status-success"></span>
-            <span class="status-text success">Sitede Var</span>
+        // Update Action Button
+        actionContainer.innerHTML = `
+          <a href="${data.url}" target="_blank" style="text-decoration: none;">
+            <button class="btn-premium btn-shopify">
+               🛍️ Sitede Gör
+            </button>
           </a>
         `;
+        // Update Top Badge
+        badgeContainer.innerHTML = `
+          <div class="badge" style="border-color: var(--success); color: var(--success); background: rgba(34, 197, 94, 0.1);">
+            <span class="status-dot status-success"></span> Sitede Var
+          </div>
+        `;
       } else {
-        valueDiv.innerHTML = `
-          <span class="status-dot status-error"></span>
-          <span class="status-text error">Sitede Bulunamadı</span>
+        actionContainer.innerHTML = `
+          <button class="btn-premium btn-shopify" disabled style="opacity: 0.5; cursor: not-allowed;" title="Ürün Shopify'da bulunamadı">
+             🔍 Sitede Yok
+          </button>
+        `;
+        badgeContainer.innerHTML = `
+          <div class="badge" style="border-color: var(--error); color: var(--error); background: rgba(239, 68, 68, 0.1);">
+            <span class="status-dot status-error"></span> Sitede Yok
+          </div>
         `;
       }
     } catch (error) {
       console.error('Shopify fetch error:', error);
-      const valueDiv = container.querySelector('.info-value');
-      valueDiv.innerHTML = `
-        <span class="status-dot status-error"></span>
-        <span class="status-text error">Hata oluştu</span>
-      `;
+      actionContainer.innerHTML = `<button class="btn-premium btn-shopify" disabled>Hata</button>`;
     }
   }
 }
 
-// Global scope AI function - REFACTOR: Uses Global Cache
+// Toast Notification System
+window.showToast = function (message, type = 'info') {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+
+  const icons = {
+    success: '✅',
+    error: '❌',
+    info: 'ℹ️',
+    warning: '⚠️'
+  };
+
+  toast.innerHTML = `
+    <span>${icons[type] || 'ℹ️'}</span>
+    <span>${message}</span>
+  `;
+
+  container.appendChild(toast);
+
+  // Auto remove
+  setTimeout(() => {
+    toast.classList.add('toast-exit');
+    setTimeout(() => {
+      if (toast.parentNode === container) {
+        container.removeChild(toast);
+      }
+    }, 300);
+  }, 3000);
+};
+
+// Global scope AI function
 window.generateAIText = async function (productCode) {
   const product = window.pageProducts[productCode];
   if (!product) {
-    alert('Hata: Ürün verisi bulunamadı.');
+    showToast('Hata: Ürün verisi bulunamadı.', 'error');
     return;
   }
 
@@ -281,7 +321,7 @@ window.generateAIText = async function (productCode) {
 
   } catch (error) {
     if (document.getElementById(loadingId)) document.body.removeChild(document.getElementById(loadingId));
-    alert('Hata: ' + error.message);
+    showToast('Hata: ' + error.message, 'error');
   }
 }
 
@@ -431,7 +471,37 @@ function getStockBadge(quantity) {
 // UI State Functions
 function showLoading() {
   hideAll();
-  loadingEl.classList.remove('hidden');
+  productList.innerHTML = '';
+  resultsSection.classList.remove('hidden');
+
+  // Create Skeleton Placeholders
+  for (let i = 0; i < 2; i++) {
+    const skeleton = document.createElement('div');
+    skeleton.className = 'product-card';
+    skeleton.innerHTML = `
+      <div class="product-header" style="height: 270px; border-bottom: none;">
+        <div class="product-header-content">
+          <div class="product-image-container skeleton"></div>
+          <div class="product-title-group" style="flex: 1;">
+            <div class="skeleton" style="height: 32px; width: 70%; margin-bottom: 12px;"></div>
+            <div class="skeleton" style="height: 24px; width: 40%; margin-bottom: 30px;"></div>
+            <div class="skeleton" style="height: 48px; width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="product-body" style="padding-top: 0;">
+        <div class="info-grid">
+          ${Array(4).fill('<div class="info-item"><div class="skeleton" style="height: 50px;"></div></div>').join('')}
+        </div>
+        <div class="skeleton" style="height: 140px; margin-top: 1.5rem; border-radius: 12px;"></div>
+        <div class="action-buttons">
+          <div class="skeleton" style="height: 54px; grid-column: span 2; border-radius: 12px;"></div>
+          <div class="skeleton" style="height: 54px; grid-column: span 2; border-radius: 12px;"></div>
+        </div>
+      </div>
+    `;
+    productList.appendChild(skeleton);
+  }
 }
 
 function showError(message) {
@@ -528,8 +598,11 @@ function escapeHtml(text) {
 // Utility: Copy Code
 window.copyToClipboard = function (text) {
   navigator.clipboard.writeText(text).then(() => {
-    console.log('Copied');
-  }).catch(err => console.error('Copy failed', err));
+    showToast('Kopyalandı! ✅', 'success');
+  }).catch(err => {
+    console.error('Copy failed', err);
+    showToast('Kopyalama başarısız oldu.', 'error');
+  });
 }
 
 // Initialize
