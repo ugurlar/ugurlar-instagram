@@ -219,25 +219,26 @@ app.post('/api/generate-text', async (req, res) => {
 
     if (!apiKey) return res.status(500).json({ error: 'API Key eksik' });
 
-    const prompt = `
-      Sen profesyonel bir sosyal medya satış danışmanısın. Aşağıdaki ürün bilgileriyle, müşteriye Instagram DM üzerinden gönderilecek, 
-      samimi, emojili, heyecan verici ve ikna edici bir satış metni hazırla.
+      Sen profesyonel bir butik / mağaza satış danışmanısın.Müşteriye Instagram DM üzerinden gönderilecek bir yanıt hazırlıyorsun.
       
       Ürün Bilgileri:
-      Adı: ${product.name}
-      Marka: ${product.brand}
-      Renk: ${product.color}
-      Fiyat: ${product.price}
-      Stok Durumu: ${product.stockStatus}
-      Kategori: ${product.category}
-      
-      Kurallar:
-      1. Samimi bir dil kullan ("Merhaba canım", "Harika bir seçim" vb.).
-      2. Ürünün özelliklerini (marka, renk) öne çıkar.
-      3. Fiyat avantajını vurgula.
-      4. Emojiler kullan (✨, 👗, 🔥 vb.).
-      5. "Sipariş oluşturmak için bilgilerini alabilir miyim?" ile bitir.
-      6. Kısa tut.
+    - Ürün Adı: ${ product.name }
+    - Marka: ${ product.brand }
+    - Renk: ${ product.color }
+    - Fiyat: ${ product.price }
+    - Stok Durumu: ${ product.stockStatus }
+    - Mevcut Bedenler: ${ product.sizes || '-' }
+    - Kategori: ${ product.category }
+
+    Kurallar:
+    1. ** Ton:** Samimi ama profesyonel ol. (Çok "cıvık" olma, "canım", "aşkım" gibi kelimeler kullanma. "Hanımefendi" de deme. "Merhabalar", "Selamlar" gibi sıcak ama saygılı bir giriş yap.)
+    2. ** Stok Kontrolü(ÇOK ÖNEMLİ):**
+      - Eğer "Stok Durumu" içinde "Var" veya bedenler geçiyorsa, ** ASLA "Tükendi" deme **.Müşteriyi satın almaya yönlendir.
+         - Eğer "Tükendi" yazıyorsa, nazikçe stokların bittiğini belirt ve benzer ürünlere yönlendir veya gelince haber verelim de.
+      3. ** İçerik:** Ürünün markasını ve rengini vurgula.Fiyatın uygunluğunu veya kalitesini öv.
+      4. ** Kapanış:** "Sipariş oluşturmak için beden ve kargo bilgilerinizi rica edebilir miyim?" gibi net bir eylem çağrısı(Call to Action) ile bitir.
+      5. ** Emojiler:** Az ve öz kullan(✨, 👗, 🌸).Boğuculuğa kaçma.
+      6. ** Kısa ve Net Ol:** Müşteri telefondan okuyor, destan yazma.
     `;
 
     // Denenecek modeller listesi (Biri çalışmazsa diğerine geç)
@@ -255,35 +256,35 @@ app.post('/api/generate-text', async (req, res) => {
 
     for (const model of models) {
       try {
-        console.log(`🤖 Model deneniyor: ${model}`);
+        console.log(`🤖 Model deneniyor: ${ model } `);
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await axios.post(url, {
-          contents: [{ parts: [{ text: prompt }] }]
-        });
+    const response = await axios.post(url, {
+      contents: [{ parts: [{ text: prompt }] }]
+    });
 
-        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
-          successText = response.data.candidates[0].content.parts[0].text;
-          console.log(`✅ Başarılı Model: ${model}`);
-          break; // Döngüyü kır, sonucu bulduk
-        }
-      } catch (err) {
-        console.error(`❌ ${model} başarısız:`, err.message);
-        lastError = err;
-        // Devam et, sıradaki modeli dene
-      }
+    if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+      successText = response.data.candidates[0].content.parts[0].text;
+      console.log(`✅ Başarılı Model: ${model}`);
+      break; // Döngüyü kır, sonucu bulduk
     }
+  } catch (err) {
+    console.error(`❌ ${model} başarısız:`, err.message);
+    lastError = err;
+    // Devam et, sıradaki modeli dene
+  }
+}
 
     if (successText) {
-      res.json({ text: successText });
-    } else {
-      throw lastError || new Error('Hiçbir AI modeli yanıt vermedi.');
-    }
+  res.json({ text: successText });
+} else {
+  throw lastError || new Error('Hiçbir AI modeli yanıt vermedi.');
+}
 
   } catch (error) {
-    console.error('AI Error:', error.response?.data || error.message);
-    const detailedError = error.response?.data?.error?.message || error.message;
-    res.status(500).json({ error: `AI Hatası: ${detailedError}` });
-  }
+  console.error('AI Error:', error.response?.data || error.message);
+  const detailedError = error.response?.data?.error?.message || error.message;
+  res.status(500).json({ error: `AI Hatası: ${detailedError}` });
+}
 });
 
 // 5. CRON JOB (Vercel için)
