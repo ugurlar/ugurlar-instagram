@@ -277,15 +277,47 @@ app.get('/api/cron', async (req, res) => {
     if (updates.length > 0) {
       await syncToSupabase(updates);
       console.log(`✅ ${updates.length} ürün güncellendi.`);
+
+      // Log to Supabase
+      try {
+        await supabaseAPI.post('/sync_history', {
+          item_count: updates.length,
+          changed_products: updates.map(p => p.code).slice(0, 50) // Max 50 item code
+        });
+      } catch (logErr) {
+        console.error('Loglama hatası:', logErr.message);
+      }
+
       res.json({ status: 'updated', count: updates.length });
     } else {
       console.log('💤 Değişiklik yok.');
+
+      // Opsiyonel: Boş çalıştırmaları da loglayabiliriz ama tabloyu şişirmemek için sadece değişenleri logluyorum
+      // İsterseniz burayı açabilirsiniz
+
       res.json({ status: 'no_changes' });
     }
 
   } catch (error) {
     console.error('Cron Hatası:', error.message);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// 6. Sistem Durumu (Cron Geçmişi)
+app.get('/api/system-status', async (req, res) => {
+  try {
+    const response = await supabaseAPI.get('/sync_history', {
+      params: {
+        select: '*',
+        order: 'processed_at.desc',
+        limit: 10
+      }
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error('Status Error:', error.message);
+    res.status(500).json({ error: 'Durum bilgisi alınamadı' });
   }
 });
 

@@ -325,7 +325,72 @@ function hideAll() {
   resultsSection.classList.add('hidden');
   emptyState.classList.add('hidden');
 }
+// System Status Logic
+document.addEventListener('DOMContentLoaded', () => {
+  const btnStatus = document.getElementById('btn-system-status');
+  if (btnStatus) {
+    btnStatus.addEventListener('click', showSystemStatus);
+  }
+});
 
+async function showSystemStatus() {
+  const modalId = 'status-modal';
+  const existing = document.getElementById(modalId);
+  if (existing) document.body.removeChild(existing);
+
+  // Loading Modal
+  const modal = document.createElement('div');
+  modal.id = modalId;
+  modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 2000; display: flex; justify-content: center; align-items: center;';
+
+  modal.innerHTML = `
+    <div style="background: #1e1e1e; padding: 25px; border-radius: 12px; width: 90%; max-width: 600px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #333;">
+        <h3 style="color: #fff; margin-bottom: 15px;">📡 Sistem Güncelleme Geçmişi</h3>
+        <div id="status-content" style="color: #bbb;">Yükleniyor...</div>
+        <button onclick="document.body.removeChild(document.getElementById('${modalId}'))" style="margin-top: 15px; width: 100%; padding: 10px; background: #333; color: white; border: none; border-radius: 6px; cursor: pointer;">Kapat</button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  try {
+    const response = await fetch(`${API_BASE}/api/system-status`);
+    const logs = await response.json();
+
+    const contentDiv = document.getElementById('status-content');
+
+    if (logs && logs.length > 0) {
+      contentDiv.innerHTML = `
+        <table class="history-table">
+            <thead>
+                <tr>
+                    <th>Zaman</th>
+                    <th>İşlem</th>
+                    <th>Değişen Ürünler</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${logs.map(log => {
+        const date = new Date(log.processed_at).toLocaleString('tr-TR');
+        const products = log.changed_products ? log.changed_products.join(', ') : '-';
+        return `
+                    <tr>
+                        <td>${date}</td>
+                        <td><span class="status-badge success">${log.item_count} Ürün Güncellendi</span></td>
+                        <td style="font-family: monospace; font-size: 0.8em; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${products}">${products}</td>
+                    </tr>
+                  `;
+      }).join('')}
+            </tbody>
+        </table>
+      `;
+    } else {
+      contentDiv.innerHTML = '<p>Henüz kayıtlı bir güncelleme yok.</p>';
+    }
+
+  } catch (error) {
+    document.getElementById('status-content').innerHTML = `<p style="color: #ef4444;">Veri alınamadı: ${error.message}</p>`;
+  }
+}
 // Utility Functions
 function escapeHtml(text) {
   if (!text) return '-';
