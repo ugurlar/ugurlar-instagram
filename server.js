@@ -11,6 +11,11 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ugurlar2026';
 // Simple static token for the session (in a real app, use JWT or sessions)
 const AUTH_TOKEN = Buffer.from(ADMIN_PASSWORD).toString('base64');
 
+// Middleware
+app.use(cors());
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
 // AUTH MIDDLEWARE
 const authenticate = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -30,11 +35,6 @@ app.post('/api/auth/login', (req, res) => {
     res.status(401).json({ success: false, error: 'Hatalı şifre' });
   }
 });
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
 // ==========================================
 // CONFIGURATION
