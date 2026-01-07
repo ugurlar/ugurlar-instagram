@@ -277,31 +277,42 @@ async function loadShopifyStatus(products) {
 
         // UPDATE PRICE: Shopify'dan gelen güncel fiyatı göster (İndirim varsa üstü çizili)
         if (data.price) {
-          const priceContainer = actionContainer.closest('.product-card').querySelector('.product-price');
+          const card = badgeContainer.closest('.product-card');
+          const priceContainer = card?.querySelector('.product-title-group .product-price');
+
           if (priceContainer) {
+            console.log(`💰 Fiyat güncelleniyor: ${code} -> ${data.price}`);
             let priceHtml = '';
-            if (data.compareAtPrice && parseFloat(data.compareAtPrice) > parseFloat(data.price)) {
-              priceHtml = `
-                <span class="price-original" style="text-decoration: line-through; opacity: 0.6; font-size: 0.9em; margin-right: 8px;">
-                  ${parseFloat(data.compareAtPrice).toLocaleString('tr-TR')} ${data.currency}
-                </span>
-                <span class="price-discounted" style="color: #ef4444; font-weight: bold;">
-                  ${parseFloat(data.price).toLocaleString('tr-TR')} ${data.currency}
-                </span>
+            const currentPrice = parseFloat(data.price);
+            const comparePrice = data.compareAtPrice ? parseFloat(data.compareAtPrice) : null;
+            const currency = data.currency || 'TL';
+
+            if (!isNaN(currentPrice)) {
+              if (comparePrice && !isNaN(comparePrice) && comparePrice > currentPrice) {
+                priceHtml = `
+                  <span class="price-original" style="text-decoration: line-through; opacity: 0.6; font-size: 0.9em; margin-right: 8px;">
+                    ${comparePrice.toLocaleString('tr-TR')} ${currency}
+                  </span>
+                  <span class="price-discounted" style="color: #ef4444; font-weight: bold;">
+                    ${currentPrice.toLocaleString('tr-TR')} ${currency}
+                  </span>
+                `;
+              } else {
+                priceHtml = `${currentPrice.toLocaleString('tr-TR')} ${currency}`;
+              }
+
+              priceContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                  <div style="display: flex; align-items: center;">${priceHtml}</div>
+                  <div style="font-size: 10px; color: var(--success); font-weight: 500;">✨ Shopify Canlı Fiyat</div>
+                </div>
               `;
-            } else {
-              priceHtml = `${parseFloat(data.price).toLocaleString('tr-TR')} ${data.currency}`;
+
+              // Cache update
+              product.selling_price = data.price;
+              product.shopifyPrice = data.price;
+              product.shopifyComparePrice = data.compareAtPrice;
             }
-            priceContainer.innerHTML = `
-              <div style="display: flex; flex-direction: column; gap: 2px;">
-                <div style="display: flex; align-items: center;">${priceHtml}</div>
-                <div style="font-size: 10px; color: var(--success); font-weight: 500;">✨ Shopify Canlı Fiyat</div>
-              </div>
-            `;
-            // Cache'e de yazalım
-            product.selling_price = data.price;
-            product.shopifyPrice = data.price;
-            product.shopifyComparePrice = data.compareAtPrice;
           }
         }
 

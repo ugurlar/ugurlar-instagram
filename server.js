@@ -304,16 +304,23 @@ async function getShopifyProductHandle(sku) {
     return null;
   }
 
+  // Temiz SKU (B00041 vs 2B00041 durumları için)
+  const cleanSku = sku.replace(/^2/, ''); // Başındaki 2'yi atıp dene (opsiyonel ama yaygın bir patern)
+
   const query = `
     query($query: String!) {
-      products(first: 1, query: $query) {
+      products(first: 5, query: $query) {
         edges {
           node {
+            id
             handle
             onlineStoreUrl
-            variants(first: 1) {
+            title
+            variants(first: 50) {
               edges {
                 node {
+                  id
+                  sku
                   price
                   compareAtPrice
                 }
@@ -333,7 +340,7 @@ async function getShopifyProductHandle(sku) {
   `;
 
   try {
-    console.log(`🔍 Shopify'da aranan SKU: ${sku}`);
+    console.log(`🔍 Shopify'da aranan SKU: ${sku} (veya ${cleanSku})`);
     const response = await axios.post(
       `https://${SHOPIFY_DOMAIN}/admin/api/2024-01/graphql.json`,
       {
@@ -348,11 +355,51 @@ async function getShopifyProductHandle(sku) {
       }
     );
 
-    const edges = response.data?.data?.products?.edges;
-    if (edges && edges.length > 0) {
-      return edges[0].node;
+    const products = response.data?.data?.products?.edges || [];
+    if (products.length === 0) {
+      // Eğer ana SKU ile bulunamadıysa cleanSku ile tekrar dene
+      if (cleanSku !== sku) {
+        return getShopifyProductHandle(cleanSku);
+      }
+      return null;
     }
-    return null;
+
+    // BEST MATCH LOGIC
+    let bestMatch = null;
+
+    // 1. TAM SKU EŞLEŞMESİ (Variant SKU === sku)
+    for (const edge of products) {
+      const node = edge.node;
+      const variants = node.variants?.edges || [];
+      const exactMatch = variants.find(v => v.node.sku === sku);
+      if (exactMatch) {
+        console.log(`✅ Tam SKU eşleşmesi bulundu: ${node.handle} (Variant: ${exactMatch.node.sku})`);
+        bestMatch = { ...node, selectedVariant: exactMatch.node };
+        break;
+      }
+    }
+
+    // 2. KISMİ SKU EŞLEŞMESİ (B00041 içermesi)
+    if (!bestMatch) {
+      for (const edge of products) {
+        const node = edge.node;
+        const variants = node.variants?.edges || [];
+        const partialMatch = variants.find(v => v.node.sku && v.node.sku.includes(sku));
+        if (partialMatch) {
+          console.log(`🟡 Kısmi SKU eşleşmesi bulundu: ${node.handle} (Variant: ${partialMatch.node.sku})`);
+          bestMatch = { ...node, selectedVariant: partialMatch.node };
+          break;
+        }
+      }
+    }
+
+    // 3. HANDLE/TITLE İÇİNDE GEÇMESİ
+    if (!bestMatch) {
+      bestMatch = products[0].node;
+      console.log(`ℹ️ Varsayılan eşleşme (ilk sonuç): ${bestMatch.handle}`);
+    }
+
+    return bestMatch;
   } catch (error) {
     console.error('❌ Shopify API Hatası:', error.response?.data || error.message);
     return null;
@@ -364,15 +411,11 @@ app.get('/api/shopify-product', async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).json({ error: 'Urun kodu gerekli' });
 
-  // Onbellek veya veritabanindan hizlica bulabilirsek harika olur ama
-  // simdilik canli soralim.
   const shopifyData = await getShopifyProductHandle(code);
 
   if (shopifyData) {
-    // Eger onlineStoreUrl varsa onu kullan, yoksa handle ile biz olusturalim
     const url = shopifyData.onlineStoreUrl || `https://ugurlar.com/products/${shopifyData.handle}`;
 
-    // Resimleri ayıkla
     const images = [];
     if (shopifyData.images && shopifyData.images.edges) {
       shopifyData.images.edges.forEach(edge => {
@@ -380,15 +423,21 @@ app.get('/api/shopify-product', async (req, res) => {
       });
     }
 
-    // Fiyat bilgilerini ayıkla
-    const variant = shopifyData.variants?.edges?.[0]?.node;
+    // Use selectedVariant if available, otherwise fallback to first variant
+    let variant = shopifyData.selectedVariant;
+    if (!variant) {
+      const variantEdges = shopifyData.variants?.edges || [];
+      variant = variantEdges[0]?.node;
+    }
+
     const price = variant?.price;
     const compareAtPrice = variant?.compareAtPrice;
     const currency = 'TL';
 
+    console.log(`💰 Fiyat Bilgisi (${code}): Price=${price}, Compare=${compareAtPrice} (Variant SKU: ${variant?.sku})`);
+
     res.json({ url, handle: shopifyData.handle, images, price, compareAtPrice, currency, found: true });
   } else {
-    // Bulamazsak fallback olarak slugify mantigi veya bos donelim
     res.json({ found: false, error: 'Shopify\'da bulunamadi' });
   }
 });
