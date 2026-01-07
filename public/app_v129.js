@@ -27,7 +27,7 @@ const resultCount = document.getElementById('resultCount');
 const emptyState = document.getElementById('emptyState');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.28-GOLD (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.29-GOLD (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -244,9 +244,6 @@ function createProductCard(product, index = 0) {
       <div class="product-header">
         <div class="product-header-content">
              <div class="product-image-container">
-               <div class="shopify-top-badge" id="shopify-badge-${escapeHtml(code)}">
-                 <!-- Will be populated by loadShopifyStatus -->
-               </div>
                 ${imageUrl
       ? `<img src="${imageUrl}" alt="${escapeHtml(product.name)}" class="product-image" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'product-image-placeholder\\'><svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\' /></svg><span>Görsel Yok</span></div>';">`
       : `<div class="product-image-placeholder">
@@ -258,6 +255,9 @@ function createProductCard(product, index = 0) {
     }
              </div>
              <div class="product-title-group">
+                <div class="shopify-top-badge" id="shopify-badge-${escapeHtml(code)}">
+                   <!-- Will be populated by loadShopifyStatus -->
+                </div>
                 <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
                 <div class="price-display" id="price-display-${escapeHtml(code)}">
                   <div class="price-main">${price}</div>
@@ -330,7 +330,8 @@ async function loadShopifyStatus(products) {
         `;
         // Update Top Badge
         badgeContainer.innerHTML = `
-          <div class="badge" style="border-color: #22c55e; color: #fff; background: rgba(34, 197, 94, 0.85); font-weight: 800; text-shadow: 0 1px 2px rgba(0,0,0,0.5);">
+          <div class="badge" style="border-color: #22c55e; color: #22c55e; background: rgba(34, 197, 94, 0.1); font-weight: 600; display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;">
+            <span style="display:inline-block; width:6px; height:6px; background:#22c55e; border-radius:50%;"></span>
             Sitede Var
           </div>
         `;
@@ -977,4 +978,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.28-GOLD');
+console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.29-GOLD');

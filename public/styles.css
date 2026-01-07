@@ -750,12 +750,9 @@ body::before {
 }
 
 .shopify-top-badge {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 50;
-  /* Ensure it stays on top of the image */
-  pointer-events: none;
+  margin-bottom: 0.5rem;
+  display: flex;
+  justify-content: flex-start;
 }
 
 /* Skeleton Loading */
