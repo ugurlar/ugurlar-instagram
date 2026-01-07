@@ -269,7 +269,40 @@
             </div>
         </div>
 
-        <div class="card">
+        <div class="card" style="margin-top: 2rem;">
+            <div class="card-title" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>📊 Genel Stok Karşılaştırma Raporu</span>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="btnStartAudit" class="btn" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Raporu
+                        Başlat</button>
+                    <button id="btnFilterMismatches" class="btn btn-secondary"
+                        style="padding: 0.5rem 1rem; font-size: 0.8rem;">Sadece Hataları Göster</button>
+                </div>
+            </div>
+            <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Sistemdeki ürünleri toplu tarar ve
+                stok farklarını işaretler. (Max 50 ürün)</p>
+            <div style="max-height: 600px; overflow-y: auto;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Ürün Kodu</th>
+                            <th>Ürün Adı</th>
+                            <th style="text-align:center;">H.labs Stok</th>
+                            <th style="text-align:center;">Shopify Stok</th>
+                            <th style="text-align:center;">Durum</th>
+                        </tr>
+                    </thead>
+                    <tbody id="auditBody">
+                        <tr>
+                            <td colspan="5" style="text-align:center;">Raporu başlatmak için yukarıdaki butona tıklayın.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
             <div class="card-title">📜 Sistem Günlüğü</div>
             <div style="max-height: 400px; overflow-y: auto;">
                 <table>

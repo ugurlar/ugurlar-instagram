@@ -15,6 +15,9 @@ const btnSaveOverride = document.getElementById('btnSaveOverride');
 const btnInspect = document.getElementById('btnInspect');
 const inspectCodeInput = document.getElementById('inspectCode');
 const inspectorResult = document.getElementById('inspectorResult');
+const auditBody = document.getElementById('auditBody');
+const btnStartAudit = document.getElementById('btnStartAudit');
+const btnFilterMismatches = document.getElementById('btnFilterMismatches');
 
 // Auth Fetch Wrapper
 async function adminFetch(url, options = {}) {
