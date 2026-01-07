@@ -35,7 +35,8 @@ async function loadDiagnostics() {
         const data = await resp.json();
 
         // Render Mismatches
-        mismatchBody.innerHTML = data.mismatches.map(m => `
+        const mismatches = data.mismatches || [];
+        mismatchBody.innerHTML = mismatches.map(m => `
             <tr>
                 <td style="font-weight:700; color:var(--primary);">${m.hamur_code}</td>
                 <td style="color:var(--error);">${m.reason}</td>
@@ -47,7 +48,8 @@ async function loadDiagnostics() {
         `).join('') || '<tr><td colspan="4" style="text-align:center;">Mükemmel! Hata kaydı yok.</td></tr>';
 
         // Render Logs
-        logBody.innerHTML = data.logs.map(l => `
+        const logs = data.logs || [];
+        logBody.innerHTML = logs.map(l => `
             <tr>
                 <td><span class="status-dot status-${l.severity === 'error' ? 'error' : 'success'}"></span> ${l.severity.toUpperCase()}</td>
                 <td>${l.message}</td>

@@ -723,19 +723,32 @@ app.get('/api/cron', async (req, res) => {
 // 6. Admin Diagnostic Endpoints
 app.get('/api/admin/diagnostics', authenticate, async (req, res) => {
   try {
+    // Defensive fetching: return empty array if table doesn't exist or request fails
+    const fetchTable = async (table, params) => {
+      try {
+        const resp = await supabaseAPI.get(table, { params });
+        return resp.data || [];
+      } catch (err) {
+        console.error(`⚠️ Admin Diagnostic fetch failed for ${table}:`, err.message);
+        return [];
+      }
+    };
+
     const [mismatches, logs, overrides] = await Promise.all([
-      supabaseAPI.get('/mismatch_diagnostics', { params: { order: 'timestamp.desc', limit: 50 } }),
-      supabaseAPI.get('/system_logs', { params: { order: 'timestamp.desc', limit: 50 } }),
-      supabaseAPI.get('/matching_overrides', { params: { order: 'created_at.desc' } })
+      fetchTable('/mismatch_diagnostics', { order: 'timestamp.desc', limit: 50 }),
+      fetchTable('/system_logs', { order: 'timestamp.desc', limit: 50 }),
+      fetchTable('/matching_overrides', { order: 'created_at.desc' })
     ]);
 
     res.json({
-      mismatches: mismatches.data,
-      logs: logs.data,
-      overrides: overrides.data
+      success: true,
+      mismatches,
+      logs,
+      overrides
     });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error('🔴 Admin Diagnostic Critical Error:', error.message);
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 
