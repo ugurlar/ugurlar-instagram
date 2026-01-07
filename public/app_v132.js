@@ -26,8 +26,15 @@ const productList = document.getElementById('productList');
 const resultCount = document.getElementById('resultCount');
 const emptyState = document.getElementById('emptyState');
 
+// Scanner Elements
+const btnScan = document.getElementById('btn-scan');
+const scannerModal = document.getElementById('scanner-modal');
+const btnCloseScanner = document.getElementById('btn-close-scanner');
+let html5QrCode = null;
+
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.31-GOLD (Hardenized & Optimized) Yüklendi");
+// API Base URL
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.32-GOLD (Dynamic Barcode Scanner) Yüklendi");
 
 const API_BASE = '';
 
@@ -108,6 +115,88 @@ if (logoutBtn) {
 
 // Event Listeners
 searchForm.addEventListener('submit', handleSearch);
+
+// Scanner Event Listeners
+if (btnScan) btnScan.addEventListener('click', startScanner);
+if (btnCloseScanner) btnCloseScanner.addEventListener('click', stopScanner);
+
+// Scanner Logic
+async function startScanner() {
+  scannerModal.classList.remove('hidden');
+
+  if (!html5QrCode) {
+    // Create 'interactive' container for html5-qrcode
+    const interactive = document.getElementById('interactive');
+    const readerDiv = document.createElement('div');
+    readerDiv.id = 'reader';
+    interactive.appendChild(readerDiv);
+
+    html5QrCode = new Html5Qrcode("reader");
+  }
+
+  const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+  try {
+    await html5QrCode.start(
+      { facingMode: "environment" },
+      config,
+      onScanSuccess
+    );
+  } catch (err) {
+    console.error("Scanner Error:", err);
+    showToast("Kamera başlatılamadı. Lütfen izinleri kontrol edin.", "error");
+    stopScanner();
+  }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+  console.log(`Code scanned: ${decodedText}`, decodedResult);
+
+  // Vibrate if supported
+  if (navigator.vibrate) navigator.vibrate(200);
+
+  // Play a subtle beep sound (optional, but nice)
+  playBeep();
+
+  stopScanner();
+
+  // Trigger Search
+  searchInput.value = decodedText;
+  handleSearch(new Event('submit'));
+}
+
+async function stopScanner() {
+  if (html5QrCode && html5QrCode.isScanning) {
+    try {
+      await html5QrCode.stop();
+    } catch (err) {
+      console.error("Stop Scanner Error:", err);
+    }
+  }
+  scannerModal.classList.add('hidden');
+}
+
+function playBeep() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.05);
+    gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.2);
+  } catch (e) {
+    console.warn("Audio Context Error (Safari etc):", e);
+  }
+}
 
 // Search Handler
 // Search Handler
@@ -992,4 +1081,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel - v1.31-GOLD Ready');
+console.log('🚀 Hamurlabs Product Panel - v1.32-GOLD Ready');

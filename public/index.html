@@ -5,6 +5,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ugurlar İnstagram Envanter Paneli</title>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
   <link rel="stylesheet" href="styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,7 +32,7 @@
           </div>
         </div>
         <div class="header-info">
-          <span class="badge">v1.31-GOLD (Hardenized System)</span>
+          <span class="badge">v1.32-GOLD (Dynamic Barcode Scanner)</span>
           <button id="logoutBtn" class="btn-logout" style="display: none;">Çıkış Yap</button>
         </div>
       </div>
@@ -45,6 +46,15 @@
           <form id="searchForm" class="search-form">
             <div class="input-group">
               <input type="text" id="searchInput" placeholder="Ürün kodu veya barkod girin..." autocomplete="off">
+              <button type="button" id="btn-scan" class="btn-secondary" title="Barkod Okut">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+                  <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+                  <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+                  <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                </svg>
+              </button>
               <button type="submit" class="btn-search">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8" />
@@ -56,6 +66,22 @@
           </form>
         </div>
       </section>
+
+      <!-- Barcode Scanner Modal -->
+      <div id="scanner-modal" class="scanner-modal hidden">
+        <div class="scanner-content">
+          <div class="scanner-header">
+            <h3>Barkod Okutun</h3>
+            <button id="btn-close-scanner" class="btn-close">✕</button>
+          </div>
+          <div id="interactive" class="scanner-container">
+            <div class="scanner-ray"></div>
+          </div>
+          <div class="scanner-footer">
+            <p>Barkodu veya etiketi kameraya yaklaştırın</p>
+          </div>
+        </div>
+      </div>
 
       <!-- Loading State -->
       <div id="loading" class="loading hidden">
@@ -125,7 +151,7 @@
     </div>
   </div>
 
-  <script src="app_v131.js"></script>
+  <script src="app_v132.js"></script>
 </body>
 
 </html>
