@@ -319,6 +319,85 @@ async function loadShopifyStatus(products) {
               product.shopifyPrice = currentPrice;
               product.shopifyComparePrice = comparePrice;
               product.hasShopifyDiscount = true;
+
+              // UPDATE VARIANT STOCK IN TABLE
+              if (data.variants && data.variants.length > 0) {
+                console.log(`📦 Varyant stokları güncelleniyor: ${code}`);
+
+                const cardColor = (product.options?.['Ana Renk'] || product.color || '').toLowerCase();
+                const colorList = cardColor.split(/[,/]/).map(c => c.trim()).filter(Boolean);
+
+                data.variants.forEach(sv => {
+                  let row = null;
+                  let matchType = 'none';
+
+                  // 1. Level 1: Exact Barcode Match
+                  row = card?.querySelector(`tr[data-barcode="${sv.barcode}"]`);
+                  if (row) matchType = 'barcode';
+
+                  // 2. Level 2: Size + Color Match
+                  if (!row && sv.options) {
+                    const getOpt = (names) => {
+                      for (const name of names) {
+                        if (sv.options[name]) return sv.options[name].trim();
+                        const found = Object.keys(sv.options).find(k => k.toLowerCase().replace(/\s/g, '') === name.toLowerCase());
+                        if (found) return sv.options[found].trim();
+                      }
+                      return null;
+                    };
+
+                    const size = getOpt(['Size', 'Beden', 'Option1', 'Option2', 'Size/Quantity', 'Beden/Stok']);
+                    const svColor = (getOpt(['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
+
+                    if (size) {
+                      const rows = card?.querySelectorAll('.stock-table tbody tr');
+                      rows?.forEach(r => {
+                        const hamurSize = r.cells[0].textContent.trim();
+                        const sizeMatch = hamurSize === size;
+
+                        let colorMatch = true;
+                        if (colorList.length > 0 && svColor) {
+                          colorMatch = colorList.some(c => svColor.includes(c) || c.includes(svColor));
+                        }
+
+                        if (sizeMatch && colorMatch) {
+                          row = r;
+                          matchType = 'heuristic';
+                        }
+                      });
+                    }
+                  }
+
+                  if (row) {
+                    const stockCell = row.querySelector('.shopify-stock-cell');
+                    const hamurBarcode = row.getAttribute('data-barcode');
+
+                    if (stockCell) {
+                      const qty = parseInt(sv.inventory) || 0;
+                      let diagnosticInfo = '';
+
+                      // Data Scientist Alert: Barcode mismatch
+                      if (matchType === 'heuristic' && sv.barcode && hamurBarcode && sv.barcode !== hamurBarcode) {
+                        diagnosticInfo = `
+                          <span title="Veri Uyumsuzluğu: Panel Barkodu (${hamurBarcode}) ile Shopify Barkodu (${sv.barcode}) uyuşmuyor. Eşleşme Beden/Renk üzerinden yapıldı." 
+                                style="cursor: help; color: #f59e0b; margin-left: 4px; font-size: 12px;">
+                            ⚠️
+                          </span>`;
+                      }
+
+                      stockCell.innerHTML = `
+                        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 4px;">
+                          <span class="${qty > 0 ? 'text-green' : 'text-red'}" style="font-weight: 700;">
+                            ${qty} Adet
+                          </span>
+                          ${qty > 0 ? '<span style="display:inline-block; width:6px; height:6px; background:var(--success); border-radius:50%; box-shadow: 0 0 5px var(--success); animation: pulse 2s infinite;"></span>' : ''}
+                          ${diagnosticInfo}
+                        </div>
+                      `;
+                    }
+                  }
+                });
+              }
             }
           }
         }
@@ -571,18 +650,22 @@ function createStockTable(variants, stockInfo) {
         <thead>
           <tr>
             <th>Beden</th>
+            <th class="color-col">Renk</th>
             <th>Barkod</th>
-            <th>Stok</th>
+            <th>Mağaza Stok</th>
+            <th>Shopify Stok</th>
           </tr>
         </thead>
         <tbody>
           ${variants.map(v => `
-            <tr>
+            <tr data-barcode="${escapeHtml(v.barcode)}">
               <td>${escapeHtml(v.value || v.size || v.name || '-')}</td>
+              <td class="color-col" style="font-size: 0.85em; opacity: 0.8;">${escapeHtml(v.color || '-')}</td>
               <td>${escapeHtml(v.barcode || '-')}</td>
               <td class="${(parseInt(v.quantity) || 0) > 0 ? 'text-green' : 'text-red'}">
                 ${v.quantity !== undefined ? v.quantity : '-'} 
               </td>
+              <td class="shopify-stock-cell">-</td>
             </tr>
           `).join('')}
         </tbody>

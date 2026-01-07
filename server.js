@@ -130,11 +130,16 @@ async function syncToSupabase(products) {
     // Perform Merge
     const existing = mergedMap.get(code);
 
-    // Merge Metas (Variants)
+    // Merge Metas (Variants) - Attach color to each meta for clarity
     const existingMetas = existing.data.metas || [];
-    const newMetas = p.metas || [];
+    const newMetas = (p.metas || []).map(m => ({ ...m, color: p.options?.['Ana Renk'] || p.color }));
     const metaMap = new Map();
-    [...existingMetas, ...newMetas].forEach(m => metaMap.set(m.id || m.barcode || Math.random(), m));
+
+    // Use ID or Barcode as key, ensuring we don't lose color info
+    [...existingMetas, ...newMetas].forEach(m => {
+      const key = m.id || m.barcode || Math.random();
+      metaMap.set(key, m);
+    });
     existing.data.metas = Array.from(metaMap.values());
 
     // Merge Images
@@ -323,6 +328,12 @@ async function getShopifyProductHandle(sku) {
                   sku
                   price
                   compareAtPrice
+                  inventoryQuantity
+                  barcode
+                  selectedOptions {
+                    name
+                    value
+                  }
                 }
               }
             }
@@ -434,9 +445,20 @@ app.get('/api/shopify-product', async (req, res) => {
     const compareAtPrice = variant?.compareAtPrice;
     const currency = 'TL';
 
-    console.log(`💰 Fiyat Bilgisi (${code}): Price=${price}, Compare=${compareAtPrice} (Variant SKU: ${variant?.sku})`);
+    // Map all variants for stock comparison
+    const variants = (shopifyData.variants?.edges || []).map(edge => ({
+      sku: edge.node.sku,
+      barcode: edge.node.barcode,
+      inventory: edge.node.inventoryQuantity,
+      options: edge.node.selectedOptions.reduce((acc, opt) => {
+        acc[opt.name] = opt.value;
+        return acc;
+      }, {})
+    }));
 
-    res.json({ url, handle: shopifyData.handle, images, price, compareAtPrice, currency, found: true });
+    console.log(`💰 Fiyat ve Varyant Bilgisi (${code}): Price=${price}, Variants=${variants.length}`);
+
+    res.json({ url, handle: shopifyData.handle, images, price, compareAtPrice, currency, variants, found: true });
   } else {
     res.json({ found: false, error: 'Shopify\'da bulunamadi' });
   }
