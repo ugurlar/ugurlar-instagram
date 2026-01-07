@@ -26,14 +26,8 @@ const productList = document.getElementById('productList');
 const resultCount = document.getElementById('resultCount');
 const emptyState = document.getElementById('emptyState');
 
-// Sidebar Elements
-const historySidebar = document.getElementById('historySidebar');
-const toggleSidebarBtn = document.getElementById('toggleSidebar');
-const closeSidebarBtn = document.getElementById('closeSidebar');
-const sidebarContent = document.getElementById('sidebarContent');
-
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.26-MOBILE (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.27-GOLD (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -114,27 +108,6 @@ if (logoutBtn) {
 
 // Event Listeners
 searchForm.addEventListener('submit', handleSearch);
-
-// Sidebar Toggles
-if (toggleSidebarBtn) {
-  toggleSidebarBtn.addEventListener('click', () => {
-    historySidebar.classList.add('open');
-  });
-}
-if (closeSidebarBtn) {
-  closeSidebarBtn.addEventListener('click', () => {
-    historySidebar.classList.remove('open');
-  });
-}
-
-// Close sidebar when clicking outside
-document.addEventListener('click', (e) => {
-  if (historySidebar.classList.contains('open') &&
-    !historySidebar.contains(e.target) &&
-    !toggleSidebarBtn.contains(e.target)) {
-    historySidebar.classList.remove('open');
-  }
-});
 
 // Search Handler
 // Search Handler
@@ -840,6 +813,7 @@ window.copyProductInfo = async function (productCode) {
     });
   }
 
+  const color = product.options?.['Ana Renk'] || product.color || '-';
   const text = `Merhaba,\n\nİlgilendiğiniz ürün bilgileri aşağıdadır:\n\nÜrün: ${name}\nKod: ${productCode}\nMarka: ${brand}\nRenk: ${color}\nFiyat: ${price}${stockText}\n\nÜrünü incelemek ve satın almak için: ${productUrl}\n\nSipariş oluşturmak için WhatsApp hattımızdan bize ulaşabilirsiniz. 👇`;
 
   navigator.clipboard.writeText(text).then(() => {
@@ -919,116 +893,12 @@ function hideAll() {
   // Do NOT hide recentProductsSection here by default, let individual functions manage it
 }
 
-// Recent Products Logic
-async function fetchRecentProducts() {
-  try {
-    const response = await authFetch(`${API_BASE}/api/products?limit=10`);
-    if (!response.ok) throw new Error('Failed to fetch recent products');
-
-    const data = await response.json();
-    const products = data.data || [];
-
-    if (products.length > 0) {
-      const stockData = await fetchStock();
-      renderRecentProducts(products, stockData);
-    }
-  } catch (error) {
-    console.error('Recent products fetch error:', error);
-  }
-}
-
-function renderRecentProducts(products, stockData) {
-  const container = sidebarContent;
-  container.innerHTML = '';
-
-  if (!products || products.length === 0) {
-    container.innerHTML = '<div style="color:var(--text-muted); text-align:center; padding:1rem;">Henüz güncelleme yok</div>';
-    return;
-  }
-
-  products.forEach((product) => {
-    // Global Cache
-    const productId = product.code || 'unknown_' + Math.random().toString(36).substr(2, 9);
-    if (!product.code) product.code = productId;
-
-    // Merge Stock
-    product.stockInfo = getStockInfo(product, stockData);
-    window.pageProducts[productId] = product;
-
-    // Create compact card
-    const cardHtml = createCompactProductCard(product);
-    container.insertAdjacentHTML('beforeend', cardHtml);
-  });
-}
-
-function createCompactProductCard(product) {
-  const code = product.code;
-  const imageUrl = (product.images && product.images.length > 0) ? product.images[0] : null;
-  const price = product.selling_price ? `${product.selling_price} TL` : '-';
-
-  // Stock Status Badge
-  let stockBadge = '<span style="color:var(--error); font-size: 0.7em;">Tükendi</span>';
-  const variants = product.metas || [];
-  let totalStock = 0;
-
-  if (variants.length > 0) {
-    totalStock = variants.reduce((acc, v) => acc + (parseInt(v.quantity) || 0), 0);
-  } else if (product.stockInfo && product.stockInfo.quantity) {
-    totalStock = parseInt(product.stockInfo.quantity);
-  }
-
-  if (totalStock > 0) {
-    stockBadge = `<span style="color:var(--success); font-size: 0.7em;">${totalStock} Adet</span>`;
-  }
-
-  return `
-    <div class="sidebar-item" onclick="handleSearchFromSidebar('${escapeHtml(code)}')">
-      <div class="sidebar-item-img">
-         ${imageUrl
-      ? `<img src="${imageUrl}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'small-placeholder\\'><svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\' /></svg></div>';">`
-      : `<div class="small-placeholder">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-               </div>`
-    }
-      </div>
-      <div class="sidebar-item-info">
-        <div class="sidebar-item-title">${escapeHtml(product.name)}</div>
-        <div class="sidebar-item-meta">
-           <span style="font-family:monospace;">${escapeHtml(code)}</span>
-           ${stockBadge}
-        </div>
-        <div class="sidebar-item-price">${price}</div>
-      </div>
-    </div>
-  `;
-}
-
-function handleSearchFromSidebar(code) {
-  const searchInput = document.getElementById('searchInput');
-  if (searchInput) {
-    searchInput.value = code;
-    const form = document.getElementById('searchForm');
-    if (form) form.dispatchEvent(new Event('submit'));
-
-    // Close sidebar on mobile
-    if (window.innerWidth < 768) {
-      const sidebar = document.getElementById('historySidebar');
-      if (sidebar) sidebar.classList.remove('open');
-    }
-  }
-}
-
 // System Status Logic
 document.addEventListener('DOMContentLoaded', () => {
   const btnStatus = document.getElementById('btn-system-status');
   if (btnStatus) {
     btnStatus.addEventListener('click', showSystemStatus);
   }
-
-  // Load recent products
-  fetchRecentProducts();
 });
 
 async function showSystemStatus() {
@@ -1108,4 +978,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.26-MOBILE');
+console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.27-GOLD');

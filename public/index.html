@@ -16,25 +16,22 @@
     <!-- Header -->
     <header class="header">
       <div class="header-content">
-        <div class="logo">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path
-              d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-            <polyline points="7.5 4.21 12 6.81 16.5 4.21" />
-            <polyline points="7.5 19.79 7.5 14.6 3 12" />
-            <polyline points="21 12 16.5 14.6 16.5 19.79" />
-            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-            <line x1="12" y1="22.08" x2="12" y2="12" />
-          </svg>
-          <h1>Ugurlar İnstagram Envanter Paneli</h1>
+        <div class="brand">
+          <div class="logo">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+              <line x1="12" y1="22.08" x2="12" y2="12" />
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>Ugurlar</h1>
+            <p>Instagram Envanter Paneli</p>
+          </div>
         </div>
         <div class="header-info">
-          <button id="toggleSidebar" class="btn-icon" title="Geçmiş / Güncellemeler">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-          <span class="badge">v1.26-MOBILE (Live Stock Engine)</span>
+          <span class="badge">v1.27-GOLD (Live Stock Engine)</span>
           <button id="logoutBtn" class="btn-logout" style="display: none;">Çıkış Yap</button>
         </div>
       </div>
@@ -106,16 +103,6 @@
     <!-- Toast Container -->
     <div id="toast-container"></div>
 
-    <!-- Sidebar -->
-    <aside id="historySidebar" class="sidebar">
-      <div class="sidebar-header">
-        <h3>🔥 Son Güncellemeler</h3>
-        <button id="closeSidebar" class="btn-icon-small">✕</button>
-      </div>
-      <div id="sidebarContent" class="sidebar-content">
-        <!-- Compact Items will be injected here -->
-      </div>
-    </aside>
   </div>
 
   <!-- Login Overlay -->
@@ -138,7 +125,7 @@
     </div>
   </div>
 
-  <script src="app_v126.js"></script>
+  <script src="app_v127.js"></script>
 </body>
 
 </html>
