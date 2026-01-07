@@ -122,53 +122,70 @@ if (btnCloseScanner) btnCloseScanner.addEventListener('click', stopScanner);
 
 // Scanner Logic
 async function startScanner() {
+  // Check for Secure Context (HTTPS requirement for cameras)
+  if (!window.isSecureContext) {
+    showToast("Kamera özelliği için HTTPS (güvenli bağlantı) gereklidir. Lütfen güvenli bağlantı üzerinden bağlanın.", "error");
+    return;
+  }
+
   scannerModal.classList.remove('hidden');
 
   if (!html5QrCode) {
-    // Create 'interactive' container for html5-qrcode
     const interactive = document.getElementById('interactive');
     const readerDiv = document.createElement('div');
     readerDiv.id = 'reader';
     interactive.appendChild(readerDiv);
-
     html5QrCode = new Html5Qrcode("reader");
   }
 
   const config = {
     fps: 20,
-    qrbox: { width: 300, height: 150 }, // Optimized for 1D barcodes
-    aspectRatio: 1.777778, // 16:9 High-Def Aspect
+    qrbox: { width: 300, height: 150 },
+    aspectRatio: 1.777778,
     experimentalFeatures: {
       useBarCodeDetectorIfSupported: true
     }
   };
 
-  // Adaptive Constraints: Try HD first, then fall back
+  // 1. High-Performance Back Camera (Environment)
   const hdConstraints = {
-    width: { min: 640, ideal: 1280, max: 1920 },
-    height: { min: 480, ideal: 720, max: 1080 },
     facingMode: "environment",
-    focusMode: "continuous"
+    width: { ideal: 1280 },
+    height: { ideal: 720 }
   };
 
+  // 2. Standard Back Camera
   const fallbackConstraints = {
     facingMode: "environment"
   };
 
+  // 3. Absolute Fallback: Any Camera
+  const absoluteFallback = {
+    facingMode: "user" // Try front camera if back fails
+  };
+
   try {
-    // Try starting with high constraints
+    // Ensure it's stopped before starting a new one
+    if (html5QrCode.isScanning) await html5QrCode.stop();
+
+    console.log("Starting camera: HD Environment...");
     await html5QrCode.start(hdConstraints, config, onScanSuccess);
-    console.log("✅ Camera started in HD mode");
   } catch (err) {
-    console.warn("⚠️ HD Camera failed, trying fallback:", err);
+    console.warn("HD failed, trying Standard Environment...", err);
     try {
-      // Failed HD? Try basic mode
       await html5QrCode.start(fallbackConstraints, config, onScanSuccess);
-      console.log("✅ Camera started in standard mode");
     } catch (err2) {
-      console.error("❌ All camera attempts failed:", err2);
-      showToast("Kamera başlatılamadı. Lütfen kamera izni verdiğinizden ve başka bir uygulamanın kamerayı kullanmadığından emin olun.", "error");
-      stopScanner();
+      console.warn("Standard Environment failed, trying Any Camera...", err2);
+      try {
+        await html5QrCode.start({}, config, onScanSuccess); // {} means any available
+      } catch (err3) {
+        console.error("All camera initialization failed:", err3);
+        const errorMsg = err3.name === "NotAllowedError"
+          ? "Kamera izni reddedildi. Lütfen tarayıcı ayarlarından izin verin."
+          : "Kamera başlatılamadı. Lütfen başka bir uygulamanın kamerayı kullanmadığından emin olun.";
+        showToast(errorMsg, "error");
+        stopScanner();
+      }
     }
   }
 }
