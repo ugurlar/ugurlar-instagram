@@ -274,6 +274,56 @@ async function loadShopifyStatus(products) {
             <span class="status-dot status-success"></span> Sitede Var
           </div>
         `;
+
+        // UPDATE PRICE: Shopify'dan gelen güncel fiyatı göster (İndirim varsa üstü çizili)
+        if (data.price) {
+          const priceContainer = actionContainer.closest('.product-card').querySelector('.product-price');
+          if (priceContainer) {
+            let priceHtml = '';
+            if (data.compareAtPrice && parseFloat(data.compareAtPrice) > parseFloat(data.price)) {
+              priceHtml = `
+                <span class="price-original" style="text-decoration: line-through; opacity: 0.6; font-size: 0.9em; margin-right: 8px;">
+                  ${parseFloat(data.compareAtPrice).toLocaleString('tr-TR')} ${data.currency}
+                </span>
+                <span class="price-discounted" style="color: #ef4444; font-weight: bold;">
+                  ${parseFloat(data.price).toLocaleString('tr-TR')} ${data.currency}
+                </span>
+              `;
+            } else {
+              priceHtml = `${parseFloat(data.price).toLocaleString('tr-TR')} ${data.currency}`;
+            }
+            priceContainer.innerHTML = `
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <div style="display: flex; align-items: center;">${priceHtml}</div>
+                <div style="font-size: 10px; color: var(--success); font-weight: 500;">✨ Shopify Canlı Fiyat</div>
+              </div>
+            `;
+            // Cache'e de yazalım
+            product.selling_price = data.price;
+            product.shopifyPrice = data.price;
+            product.shopifyComparePrice = data.compareAtPrice;
+          }
+        }
+
+        // FALLBACK: Görsel yoksa VEYA mevcut görsel bozuksa (placeholder varsa) Shopify'dan gelen görseli kullan
+        const currentCard = document.querySelector(`#shopify-badge-${code}`)?.parentElement;
+        const imageContainer = currentCard?.querySelector('.product-image-container');
+
+        if (imageContainer && data.images && data.images.length > 0) {
+          const hasPlaceholder = imageContainer.querySelector('.product-image-placeholder');
+          const hasNoImages = !product.images || product.images.length === 0;
+
+          if (hasPlaceholder || hasNoImages) {
+            const shopifyImgUrl = data.images[0];
+            imageContainer.innerHTML = `
+              <img src="${shopifyImgUrl}" alt="${escapeHtml(product.name)}" class="product-image" loading="lazy" 
+                   title="Shopify'dan yüklendi"
+                   onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'product-image-placeholder\\'><svg xmlns=\\'http://www.w3.org/2000/svg\\' fill=\\'none\\' viewBox=\\'0 0 24 24\\' stroke=\\'currentColor\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'1\\' d=\\'M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\\' /></svg><span>Görsel Yok</span></div>';">
+            `;
+            // Cache'e de ekleyelim
+            product.images = data.images;
+          }
+        }
       } else {
         actionContainer.innerHTML = `
           <button class="btn-premium btn-shopify" disabled style="opacity: 0.5; cursor: not-allowed;" title="Ürün Shopify'da bulunamadı">

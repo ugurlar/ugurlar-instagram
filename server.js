@@ -72,22 +72,103 @@ async function makeStealthRequest(endpoint, params = {}) {
 async function syncToSupabase(products) {
   if (!products || products.length === 0) return;
 
-  const formattedProducts = products.map(p => ({
-    code: p.code || p.sku || 'unknown-' + Math.random(),
-    name: p.name || p.title || '-',
-    barcode: p.barcode || (p.metas && p.metas[0] ? p.metas[0].barcode : null),
-    brand: p.brand || p.options?.Marka || null,
-    price: p.selling_price ? String(p.selling_price) : null,
-    stock_status: p.is_stock ? 'Var' : 'Yok',
-    category: (p.categories && p.categories[0]) || null,
-    data: p
-  }));
+  // 1. Get all codes in this batch
+  const codes = [...new Set(products.map(p => p.code).filter(Boolean))];
 
-  const uniqueProducts = Array.from(new Map(formattedProducts.map(item => [item.code, item])).values());
+  // 2. Fetch existing products from Supabase for these codes
+  let existingMap = new Map();
+  if (codes.length > 0) {
+    try {
+      // Chunk codes to avoid long URL (max 50 codes per query)
+      const chunkSize = 50;
+      for (let i = 0; i < codes.length; i += chunkSize) {
+        const chunk = codes.slice(i, i + chunkSize);
+        const codeFilter = chunk.join(',');
+        const response = await supabaseAPI.get('/products', {
+          params: {
+            code: `in.(${codeFilter})`,
+            select: '*'
+          }
+        });
+        response.data.forEach(item => existingMap.set(item.code, item));
+      }
+    } catch (err) {
+      console.warn('⚠️ Mevcut ürünler çekilemedi, üzerine yazılacak:', err.message);
+    }
+  }
+
+  // 3. Process and Merge
+  const mergedMap = new Map();
+
+  products.forEach(p => {
+    const code = p.code || p.sku || 'unknown-' + Math.random();
+
+    // Start with existing data from Supabase or new object
+    if (!mergedMap.has(code)) {
+      const existingInDb = existingMap.get(code);
+
+      if (existingInDb) {
+        // Clone DB record to start with
+        mergedMap.set(code, JSON.parse(JSON.stringify(existingInDb)));
+      } else {
+        // Create new record structure
+        mergedMap.set(code, {
+          code: code,
+          name: p.name || p.title || '-',
+          barcode: p.barcode || (p.metas && p.metas[0] ? p.metas[0].barcode : null),
+          brand: p.brand || p.options?.Marka || null,
+          price: p.selling_price ? String(p.selling_price) : null,
+          stock_status: p.is_stock ? 'Var' : 'Yok',
+          category: (p.categories && p.categories[0]) || null,
+          data: JSON.parse(JSON.stringify(p))
+        });
+        // Skip further merging for the first occurrence in THIS batch if it's brand new
+        return;
+      }
+    }
+
+    // Perform Merge
+    const existing = mergedMap.get(code);
+
+    // Merge Metas (Variants)
+    const existingMetas = existing.data.metas || [];
+    const newMetas = p.metas || [];
+    const metaMap = new Map();
+    [...existingMetas, ...newMetas].forEach(m => metaMap.set(m.id || m.barcode || Math.random(), m));
+    existing.data.metas = Array.from(metaMap.values());
+
+    // Merge Images
+    const existingImages = existing.data.images || [];
+    const newImages = p.images || [];
+    existing.data.images = [...new Set([...existingImages, ...newImages])];
+
+    // Merge Options (Colors etc)
+    if (p.options) {
+      if (!existing.data.options) existing.data.options = {};
+      for (const [key, val] of Object.entries(p.options)) {
+        const existingVal = existing.data.options[key];
+        if (existingVal && val && existingVal !== val && !existingVal.includes(val)) {
+          existing.data.options[key] = existingVal + ", " + val;
+        } else if (!existingVal && val) {
+          existing.data.options[key] = val;
+        }
+      }
+    }
+
+    // Update Overall Fields
+    if (p.is_stock) {
+      existing.stock_status = 'Var';
+      existing.data.is_stock = true;
+    }
+    // Update name if changed (or keep combined if needed, but usually Hamurlabs names reflect the generic title)
+    // existing.name = p.name || existing.name; 
+  });
+
+  const uniqueProducts = Array.from(mergedMap.values());
 
   try {
     await supabaseAPI.post('/products', uniqueProducts);
-    console.log(`☁️ ${uniqueProducts.length} ürün Supabase'e gönderildi.`);
+    console.log(`☁️ ${uniqueProducts.length} ürün Supabase'e (zenginleştirilerek) gönderildi.`);
   } catch (err) {
     console.error('Supabase Sync Hatası:', err.response?.data || err.message);
   }
@@ -223,14 +304,28 @@ async function getShopifyProductHandle(sku) {
     return null;
   }
 
-  // General query works better than sku: prefix because Shopify SKUs contain size suffixes
   const query = `
-    {
-      products(first: 1, query: "${sku}") {
+    query($query: String!) {
+      products(first: 1, query: $query) {
         edges {
           node {
             handle
             onlineStoreUrl
+            variants(first: 1) {
+              edges {
+                node {
+                  price
+                  compareAtPrice
+                }
+              }
+            }
+            images(first: 5) {
+              edges {
+                node {
+                  url
+                }
+              }
+            }
           }
         }
       }
@@ -238,9 +333,13 @@ async function getShopifyProductHandle(sku) {
   `;
 
   try {
+    console.log(`🔍 Shopify'da aranan SKU: ${sku}`);
     const response = await axios.post(
       `https://${SHOPIFY_DOMAIN}/admin/api/2024-01/graphql.json`,
-      { query },
+      {
+        query,
+        variables: { query: sku }
+      },
       {
         headers: {
           'X-Shopify-Access-Token': SHOPIFY_TOKEN,
@@ -255,7 +354,7 @@ async function getShopifyProductHandle(sku) {
     }
     return null;
   } catch (error) {
-    console.error('Shopify API Error:', error.message);
+    console.error('❌ Shopify API Hatası:', error.response?.data || error.message);
     return null;
   }
 }
@@ -272,7 +371,22 @@ app.get('/api/shopify-product', async (req, res) => {
   if (shopifyData) {
     // Eger onlineStoreUrl varsa onu kullan, yoksa handle ile biz olusturalim
     const url = shopifyData.onlineStoreUrl || `https://ugurlar.com/products/${shopifyData.handle}`;
-    res.json({ url, handle: shopifyData.handle, found: true });
+
+    // Resimleri ayıkla
+    const images = [];
+    if (shopifyData.images && shopifyData.images.edges) {
+      shopifyData.images.edges.forEach(edge => {
+        if (!images.includes(edge.node.url)) images.push(edge.node.url);
+      });
+    }
+
+    // Fiyat bilgilerini ayıkla
+    const variant = shopifyData.variants?.edges?.[0]?.node;
+    const price = variant?.price;
+    const compareAtPrice = variant?.compareAtPrice;
+    const currency = 'TL';
+
+    res.json({ url, handle: shopifyData.handle, images, price, compareAtPrice, currency, found: true });
   } else {
     // Bulamazsak fallback olarak slugify mantigi veya bos donelim
     res.json({ found: false, error: 'Shopify\'da bulunamadi' });
@@ -434,6 +548,39 @@ app.get('/api/system-status', async (req, res) => {
   } catch (error) {
     console.error('Status Error:', error.message);
     res.status(500).json({ error: 'Durum bilgisi alınamadı' });
+  }
+});
+
+// 7. Manuel Senkronizasyon (Force Sync via Code)
+app.get('/api/force-sync', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ error: 'Ürün kodu gerekli (code)' });
+
+    console.log(`🚀 Force Sync Başlatıldı: ${code}`);
+
+    // Hamurlabs'ten tüm kayıtları ara (search parametresiyle)
+    const response = await makeStealthRequest('/product/list/', {
+      code: code,
+      limit: 50 // Garanti olsun
+    });
+
+    const products = response.data.results || response.data.data || [];
+
+    if (products.length > 0) {
+      // Bulunan tüm kayıtları sync ve merge işlemine sok
+      await syncToSupabase(products);
+
+      console.log(`✅ Force Sync Tamam: ${products.length} kayıt işlendi.`);
+      res.json({ status: 'success', message: `${products.length} kayıt birleştirildi ve güncellendi.`, products: products.map(p => ({ code: p.code, name: p.options?.['Ana Renk'] })) });
+    } else {
+      console.log('⚠️ Force Sync: Kayıt bulunamadı.');
+      res.json({ status: 'not_found', message: 'Hamurlabs tarafında bu kodla ürün bulunamadı.' });
+    }
+
+  } catch (error) {
+    console.error('Force Sync Hatası:', error.message);
+    res.status(500).json({ error: error.message });
   }
 });
 
