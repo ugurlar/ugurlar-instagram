@@ -720,7 +720,60 @@ app.get('/api/cron', async (req, res) => {
   }
 });
 
-// 6. Sistem Durumu (Cron Geçmişi)
+// 6. Admin Diagnostic Endpoints
+app.get('/api/admin/diagnostics', authenticate, async (req, res) => {
+  try {
+    const [mismatches, logs, overrides] = await Promise.all([
+      supabaseAPI.get('/mismatch_diagnostics', { params: { order: 'timestamp.desc', limit: 50 } }),
+      supabaseAPI.get('/system_logs', { params: { order: 'timestamp.desc', limit: 50 } }),
+      supabaseAPI.get('/matching_overrides', { params: { order: 'created_at.desc' } })
+    ]);
+
+    res.json({
+      mismatches: mismatches.data,
+      logs: logs.data,
+      overrides: overrides.data
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/match-override', authenticate, async (req, res) => {
+  try {
+    const { hamur_code, shopify_handle } = req.body;
+    if (!hamur_code || !shopify_handle) return res.status(400).json({ error: 'Hamur kodu ve Shopify handle gerekli' });
+
+    // Upsert override
+    const { data, error } = await supabaseAPI.post('/matching_overrides', {
+      hamur_code,
+      shopify_handle,
+      created_at: new Date().toISOString()
+    }, {
+      headers: { 'Prefer': 'resolution=merge-duplicates' }
+    });
+
+    // Clear cache for this SKU
+    shopifyCache.del(`shopify_${hamur_code}`);
+
+    res.json({ success: true, message: 'Eşleştirme başarıyla kaydedildi.' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/delete-override', authenticate, async (req, res) => {
+  try {
+    const { hamur_code } = req.body;
+    await supabaseAPI.delete('/matching_overrides', { params: { hamur_code: `eq.${hamur_code}` } });
+    shopifyCache.del(`shopify_${hamur_code}`);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 7. Sistem Durumu (Cron Geçmişi)
 app.get('/api/system-status', authenticate, async (req, res) => {
   try {
     const response = await supabaseAPI.get('/sync_history', {
