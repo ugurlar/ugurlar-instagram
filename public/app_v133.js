@@ -143,23 +143,33 @@ async function startScanner() {
     }
   };
 
-  const videoConstraints = {
+  // Adaptive Constraints: Try HD first, then fall back
+  const hdConstraints = {
     width: { min: 640, ideal: 1280, max: 1920 },
     height: { min: 480, ideal: 720, max: 1080 },
     facingMode: "environment",
     focusMode: "continuous"
   };
 
+  const fallbackConstraints = {
+    facingMode: "environment"
+  };
+
   try {
-    await html5QrCode.start(
-      videoConstraints,
-      config,
-      onScanSuccess
-    );
+    // Try starting with high constraints
+    await html5QrCode.start(hdConstraints, config, onScanSuccess);
+    console.log("✅ Camera started in HD mode");
   } catch (err) {
-    console.error("Scanner Error:", err);
-    showToast("Kamera başlatılamadı. Lütfen yüksek çözünürlük izni verin.", "error");
-    stopScanner();
+    console.warn("⚠️ HD Camera failed, trying fallback:", err);
+    try {
+      // Failed HD? Try basic mode
+      await html5QrCode.start(fallbackConstraints, config, onScanSuccess);
+      console.log("✅ Camera started in standard mode");
+    } catch (err2) {
+      console.error("❌ All camera attempts failed:", err2);
+      showToast("Kamera başlatılamadı. Lütfen kamera izni verdiğinizden ve başka bir uygulamanın kamerayı kullanmadığından emin olun.", "error");
+      stopScanner();
+    }
   }
 }
 
