@@ -34,7 +34,7 @@ let html5QrCode = null;
 
 // API Base URL
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.33-GOLD (High-Performance Scanner) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.35-GOLD (Robust Camera Selection) Yüklendi");
 
 const API_BASE = '';
 
@@ -122,70 +122,70 @@ if (btnCloseScanner) btnCloseScanner.addEventListener('click', stopScanner);
 
 // Scanner Logic
 async function startScanner() {
-  // Check for Secure Context (HTTPS requirement for cameras)
   if (!window.isSecureContext) {
-    showToast("Kamera özelliği için HTTPS (güvenli bağlantı) gereklidir. Lütfen güvenli bağlantı üzerinden bağlanın.", "error");
+    showToast("Kamera özelliği için HTTPS (güvenli bağlantı) gereklidir.", "error");
     return;
   }
 
+  // Cleanup existing reader div to avoid 'id already in use' errors
+  const interactive = document.getElementById('interactive');
+  interactive.innerHTML = '<div class="scanner-ray"></div>'; // Keep ray, clear content
+  const readerDiv = document.createElement('div');
+  readerDiv.id = 'reader';
+  interactive.appendChild(readerDiv);
+
   scannerModal.classList.remove('hidden');
 
-  if (!html5QrCode) {
-    const interactive = document.getElementById('interactive');
-    const readerDiv = document.createElement('div');
-    readerDiv.id = 'reader';
-    interactive.appendChild(readerDiv);
-    html5QrCode = new Html5Qrcode("reader");
+  if (html5QrCode && html5QrCode.isScanning) {
+    try { await html5QrCode.stop(); } catch (e) { }
   }
+  html5QrCode = new Html5Qrcode("reader");
 
   const config = {
     fps: 20,
     qrbox: { width: 300, height: 150 },
     aspectRatio: 1.777778,
-    experimentalFeatures: {
-      useBarCodeDetectorIfSupported: true
-    }
-  };
-
-  // 1. High-Performance Back Camera (Environment)
-  const hdConstraints = {
-    facingMode: "environment",
-    width: { ideal: 1280 },
-    height: { ideal: 720 }
-  };
-
-  // 2. Standard Back Camera
-  const fallbackConstraints = {
-    facingMode: "environment"
-  };
-
-  // 3. Absolute Fallback: Any Camera
-  const absoluteFallback = {
-    facingMode: "user" // Try front camera if back fails
+    experimentalFeatures: { useBarCodeDetectorIfSupported: true }
   };
 
   try {
-    // Ensure it's stopped before starting a new one
-    if (html5QrCode.isScanning) await html5QrCode.stop();
+    console.log("Detecting cameras...");
+    const devices = await Html5Qrcode.getCameras();
 
-    console.log("Starting camera: HD Environment...");
-    await html5QrCode.start(hdConstraints, config, onScanSuccess);
+    if (!devices || devices.length === 0) {
+      throw new Error("Kamera bulunamadı.");
+    }
+
+    // Try finding the back camera first
+    const backCamera = devices.find(device =>
+      device.label.toLowerCase().includes('back') ||
+      device.label.toLowerCase().includes('arka') ||
+      device.label.toLowerCase().includes('environment')
+    );
+
+    const cameraId = backCamera ? backCamera.id : devices[0].id;
+    console.log(`Starting camera ID: ${cameraId} (${backCamera ? 'Back' : 'Default'})`);
+
+    await html5QrCode.start(
+      cameraId,
+      config,
+      onScanSuccess
+    );
   } catch (err) {
-    console.warn("HD failed, trying Standard Environment...", err);
+    console.warn("Primary camera start failed, trying generic environment mode...", err);
     try {
-      await html5QrCode.start(fallbackConstraints, config, onScanSuccess);
+      // Fallback to simple environment string
+      await html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess);
     } catch (err2) {
-      console.warn("Standard Environment failed, trying Any Camera...", err2);
-      try {
-        await html5QrCode.start({}, config, onScanSuccess); // {} means any available
-      } catch (err3) {
-        console.error("All camera initialization failed:", err3);
-        const errorMsg = err3.name === "NotAllowedError"
-          ? "Kamera izni reddedildi. Lütfen tarayıcı ayarlarından izin verin."
-          : "Kamera başlatılamadı. Lütfen başka bir uygulamanın kamerayı kullanmadığından emin olun.";
-        showToast(errorMsg, "error");
-        stopScanner();
+      console.error("All camera initialization failed:", err2);
+      let errorMsg = "Kamera başlatılamadı.";
+      if (err2.includes && err2.includes("Permission")) {
+        errorMsg = "Kamera izni reddedildi. Lütfen tarayıcı ayarlarından izin verin.";
+      } else if (err2.includes && err2.includes("NotReadableError")) {
+        errorMsg = "Kamera şu an başka bir uygulama tarafından kullanılıyor. Lütfen diğer uygulamaları kapatıp tekrar deneyin.";
       }
+      showToast(errorMsg, "error");
+      stopScanner();
     }
   }
 }
@@ -1122,4 +1122,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel - v1.33-GOLD Ready');
+console.log('🚀 Hamurlabs Product Panel - v1.35-GOLD Ready');
