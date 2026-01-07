@@ -185,7 +185,7 @@ async function runGlobalAudit() {
     btnStartAudit.textContent = '⌛ Tarama Başladı...';
     auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Ürünler alınıyor...</td></tr>';
     try {
-        const resp = await adminFetch('/api/products/search?code=');
+        const resp = await adminFetch('/api/products?limit=50');
         const data = await resp.json();
         const products = data.data || [];
         if (products.length === 0) {
