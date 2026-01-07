@@ -117,7 +117,10 @@
     </aside>
   </div>
 
-  <script src="app.js"></script>
+  <script>
+    // Force direct reload if needed, but let's try versioning first
+    document.write('<script src="app.js?v=' + Date.now() + '"><\/script>');
+  </script>
 </body>
 
 </html>

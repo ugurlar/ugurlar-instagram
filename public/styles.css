@@ -601,6 +601,37 @@ body::before {
   color: var(--success);
 }
 
+/* Advanced Table Columns */
+.color-col {
+  width: 100px;
+}
+
+.shopify-stock-cell {
+  background: rgba(99, 102, 241, 0.03);
+  font-weight: 600;
+  min-width: 120px;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.5;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+
+  70% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+  }
+
+  100% {
+    transform: scale(0.95);
+    opacity: 0.5;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
 .stock-badge.low-stock {
   background: rgba(245, 158, 11, 0.1);
   color: var(--warning);
