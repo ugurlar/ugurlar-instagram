@@ -372,7 +372,14 @@ async function loadShopifyStatus(products) {
 
                   if (row) {
                     const stockCell = row.querySelector('.shopify-stock-cell');
+                    const colorCell = row.querySelector('.color-col');
                     const hamurBarcode = row.getAttribute('data-barcode');
+
+                    // LIVE COLOR POPULATION: If table says "-", try to use Shopify color
+                    if (colorCell && (!colorCell.textContent || colorCell.textContent.trim() === '-')) {
+                      const svColor = (getOpt(['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
+                      if (svColor) colorCell.innerHTML = `<span style="text-transform: capitalize;">${svColor}</span>`;
+                    }
 
                     if (stockCell) {
                       const qty = parseInt(sv.inventory) || 0;
