@@ -158,7 +158,7 @@ body::before {
   flex: 1;
   max-width: 1000px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1.5rem;
   width: 100%;
 }
 
@@ -609,7 +609,38 @@ body::before {
 .shopify-stock-cell {
   background: rgba(99, 102, 241, 0.03);
   font-weight: 600;
-  min-width: 120px;
+  min-width: 100px;
+}
+
+/* Responsive Table Wrapper */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-glass);
+  margin-top: 1rem;
+  -webkit-overflow-scrolling: touch;
+  /* Smooth scroll on iOS */
+  position: relative;
+}
+
+/* Scroll indicator gradient */
+.table-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to left, rgba(10, 10, 15, 0.5), transparent);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.table-container.can-scroll::after {
+  opacity: 1;
 }
 
 @keyframes pulse {
@@ -834,48 +865,105 @@ body::before {
   display: none !important;
 }
 
-/* Responsive Design */
+/* Senior Mobile Dev Responsive Hardening */
+@media (max-width: 1024px) {
+  .main {
+    max-width: 100%;
+    padding: 1.5rem;
+  }
+}
+
 @media (max-width: 768px) {
   .header-content {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .header-info {
+    gap: 0.5rem;
+  }
+
+  .logo svg {
+    width: 28px;
+    height: 28px;
   }
 
   .logo h1 {
-    font-size: 1rem;
+    font-size: 0.95rem;
   }
 
-  .main {
-    padding: 1rem;
+  .badge {
+    padding: 0.2rem 0.5rem;
+    font-size: 0.65rem;
   }
 
-  .search-card {
-    padding: 1.5rem;
+  .btn-logout {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+  }
+
+  .product-header {
+    padding: 1.25rem;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 1.5rem;
   }
 
   .product-header-content {
     flex-direction: column;
-    gap: 0.5rem;
+    align-items: center;
+    gap: 0.75rem;
+    width: 100%;
   }
 
-  .input-group {
-    flex-direction: column;
+  .product-title {
+    font-size: 1.25rem;
   }
 
-  .btn-search {
+  .product-price {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .action-buttons {
+    grid-template-columns: 1fr;
+    /* Stack buttons on small mobile */
+    gap: 10px;
+  }
+
+  .btn-premium {
+    padding: 1rem;
+    /* Better touch target */
+    width: 100%;
+  }
+
+  .btn-shopify {
+    width: 100%;
     justify-content: center;
   }
 
   .product-info-grid {
     grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
   }
 
-  .stock-table {
-    font-size: 0.875rem;
+  .info-item {
+    padding: 0.75rem;
   }
 
   .stock-table th,
   .stock-table td {
-    padding: 0.75rem;
+    padding: 0.75rem 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  /* Force sidebar to fill screen on mobile */
+  .sidebar {
+    width: 100%;
+    right: -100%;
+    border-left: none;
   }
 }
 
@@ -888,6 +976,48 @@ body::before {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+
+  .input-group {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .btn-search {
+    width: 100%;
+    justify-content: center;
+    padding: 1rem;
+  }
+
+  .login-card {
+    padding: 2rem 1.5rem;
+    margin: 1rem;
+  }
+
+  .header-info .badge {
+    display: none;
+    /* Hide version badge on very small screens to save space */
+  }
+}
+
+/* Touch Device Specific Enhancements */
+@media (pointer: coarse) {
+
+  .btn-premium,
+  .btn-search,
+  .btn-icon,
+  .sidebar-item {
+    min-height: 44px;
+    /* Apple/Android standards */
+  }
+
+  .sidebar-item {
+    padding: 1rem;
+  }
+
+  /* Disable hover effects that stick on touch */
+  .product-card:hover {
+    transform: none;
   }
 }
 
@@ -1181,6 +1311,7 @@ body::before {
     opacity: 0.5;
   }
 }
+
 /* AUTH UI */
 #auth-overlay {
   position: fixed;
@@ -1282,6 +1413,13 @@ body::before {
 }
 
 @keyframes fadeInDown {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

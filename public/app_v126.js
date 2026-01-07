@@ -33,7 +33,7 @@ const closeSidebarBtn = document.getElementById('closeSidebar');
 const sidebarContent = document.getElementById('sidebarContent');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.25-SECURITY (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.26-MOBILE (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -740,30 +740,32 @@ function createStockTable(variants, stockInfo) {
     return `
     <div class="stock-section">
       <h4 class="stock-title">Beden & Stok Bilgisi</h4>
-      <table class="stock-table">
-        <thead>
-          <tr>
-            <th>Beden</th>
-            <th class="color-col">Renk</th>
-            <th>Barkod</th>
-            <th>Mağaza Stok</th>
-            <th>Shopify Stok</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${variants.map(v => `
-            <tr data-barcode="${escapeHtml(v.barcode)}">
-              <td>${escapeHtml(v.value || v.size || v.name || '-')}</td>
-              <td class="color-col" style="font-size: 0.85em; opacity: 0.8;">${escapeHtml(v.color || '-')}</td>
-              <td>${escapeHtml(v.barcode || '-')}</td>
-              <td class="${(parseInt(v.quantity) || 0) > 0 ? 'text-green' : 'text-red'}">
-                ${v.quantity !== undefined ? v.quantity : '-'} 
-              </td>
-              <td class="shopify-stock-cell">-</td>
+      <div class="table-container" onscroll="this.classList.toggle('can-scroll', this.scrollWidth > this.clientWidth && this.scrollLeft + this.clientWidth < this.scrollWidth - 5)">
+        <table class="stock-table">
+          <thead>
+            <tr>
+              <th>Beden</th>
+              <th class="color-col">Renk</th>
+              <th>Barkod</th>
+              <th>Mağaza Stok</th>
+              <th>Shopify Stok</th>
             </tr>
-          `).join('')}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            ${variants.map(v => `
+              <tr data-barcode="${escapeHtml(v.barcode)}">
+                <td>${escapeHtml(v.value || v.size || v.name || '-')}</td>
+                <td class="color-col" style="font-size: 0.85em; opacity: 0.8;">${escapeHtml(v.color || '-')}</td>
+                <td>${escapeHtml(v.barcode || '-')}</td>
+                <td class="${(parseInt(v.quantity) || 0) > 0 ? 'text-green' : 'text-red'}">
+                  ${v.quantity !== undefined ? v.quantity : '-'} 
+                </td>
+                <td class="shopify-stock-cell">-</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
   }
@@ -1106,4 +1108,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel loaded with Global Cache');
+console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.26-MOBILE');
