@@ -14,6 +14,7 @@ const authOverlay = document.getElementById('auth-overlay');
 const loginForm = document.getElementById('loginForm');
 const loginPassword = document.getElementById('loginPassword');
 const logoutBtn = document.getElementById('logoutBtn');
+const adminBtn = document.getElementById('adminBtn');
 
 // DOM Elements
 const searchForm = document.getElementById('searchForm');
@@ -65,11 +66,13 @@ function handleUnauthorized() {
 function showLogin() {
   authOverlay.style.display = 'flex';
   logoutBtn.style.display = 'none';
+  if (adminBtn) adminBtn.style.display = 'none';
 }
 
 function hideLogin() {
   authOverlay.style.display = 'none';
   logoutBtn.style.display = 'inline-block';
+  if (adminBtn) adminBtn.style.display = 'inline-block';
 }
 
 // Check initial auth

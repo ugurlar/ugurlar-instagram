@@ -1557,11 +1557,8 @@ body::before {
   transform: scale(0.98);
 }
 
-.btn-logout {
-  background: rgba(239, 68, 68, 0.08);
-  /* Transparent subtle red */
-  color: #ef4444;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+.btn-logout,
+.btn-admin {
   padding: 0.6rem 1.25rem;
   border-radius: 12px;
   font-size: 0.875rem;
@@ -1574,12 +1571,31 @@ body::before {
   gap: 8px;
   min-width: max-content;
   backdrop-filter: blur(10px);
+  transition: all 0.2s ease;
+}
+
+.btn-logout {
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+.btn-admin {
+  background: rgba(99, 102, 241, 0.08);
+  /* Indigo/Primary */
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.btn-logout:hover,
+.btn-admin:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .btn-logout:hover {
   background: rgba(239, 68, 68, 0.15);
   border-color: rgba(239, 68, 68, 0.4);
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
