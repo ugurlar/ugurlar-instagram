@@ -15,6 +15,23 @@ const loginForm = document.getElementById('loginForm');
 const loginPassword = document.getElementById('loginPassword');
 const logoutBtn = document.getElementById('logoutBtn');
 
+// DOM Elements
+const searchForm = document.getElementById('searchForm');
+const searchInput = document.getElementById('searchInput');
+const loadingEl = document.getElementById('loading');
+const errorEl = document.getElementById('error');
+const errorText = document.getElementById('errorText');
+const resultsSection = document.getElementById('results');
+const productList = document.getElementById('productList');
+const resultCount = document.getElementById('resultCount');
+const emptyState = document.getElementById('emptyState');
+
+// Sidebar Elements
+const historySidebar = document.getElementById('historySidebar');
+const toggleSidebarBtn = document.getElementById('toggleSidebar');
+const closeSidebarBtn = document.getElementById('closeSidebar');
+const sidebarContent = document.getElementById('sidebarContent');
+
 // API Base URL
 console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.24-AUTH (Live Stock Engine) Yüklendi");
 
