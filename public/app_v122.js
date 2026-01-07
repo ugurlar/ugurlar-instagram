@@ -23,6 +23,8 @@ const closeSidebarBtn = document.getElementById('closeSidebar');
 const sidebarContent = document.getElementById('sidebarContent');
 
 // API Base URL
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.22 (Live Stock Engine) Yüklendi");
+
 const API_BASE = '';
 
 // Event Listeners
