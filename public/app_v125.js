@@ -33,7 +33,7 @@ const closeSidebarBtn = document.getElementById('closeSidebar');
 const sidebarContent = document.getElementById('sidebarContent');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.24-AUTH (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.25-SECURITY (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -1065,12 +1065,13 @@ async function showSystemStatus() {
             <tbody>
                 ${logs.map(log => {
         const date = new Date(log.processed_at).toLocaleString('tr-TR');
-        const products = log.changed_products ? log.changed_products.join(', ') : '-';
+        const productsRaw = log.changed_products ? log.changed_products.join(', ') : '-';
+        const productsEscaped = escapeHtml(productsRaw);
         return `
                     <tr>
-                        <td>${date}</td>
-                        <td><span class="status-badge success">${log.item_count} Ürün Güncellendi</span></td>
-                        <td style="font-family: monospace; font-size: 0.8em; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${products}">${products}</td>
+                        <td>${escapeHtml(date)}</td>
+                        <td><span class="status-badge success">${parseInt(log.item_count)} Ürün Güncellendi</span></td>
+                        <td style="font-family: monospace; font-size: 0.8em; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${productsEscaped}">${productsEscaped}</td>
                     </tr>
                   `;
       }).join('')}

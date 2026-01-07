@@ -8,12 +8,29 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ugurlar2026';
 
-// Simple static token for the session (in a real app, use JWT or sessions)
-const AUTH_TOKEN = Buffer.from(ADMIN_PASSWORD).toString('base64');
+// Security Configuration
+// Generate a slightly more secure static token (Salted Hash)
+const crypto = require('crypto');
+const AUTH_TOKEN = crypto.createHash('sha256').update(ADMIN_PASSWORD + (process.env.SUPABASE_KEY || 'static_salt')).digest('hex');
+
+// Simple In-Memory Rate Limiter
+const loginAttempts = new Map();
+const RATE_LIMIT_WINDOW = 15 * 60 * 1000; // 15 minutes
+const MAX_ATTEMPTS = 10;
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Basic Security Headers
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // AUTH MIDDLEWARE
@@ -28,10 +45,26 @@ const authenticate = (req, res, next) => {
 
 // LOGIN ENDPOINT
 app.post('/api/auth/login', (req, res) => {
+  const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+  const now = Date.now();
+
+  // Rate Limiting Check
+  const attempts = loginAttempts.get(ip) || { count: 0, lastAttempt: 0 };
+  if (attempts.count >= MAX_ATTEMPTS && (now - attempts.lastAttempt) < RATE_LIMIT_WINDOW) {
+    const waitTime = Math.ceil((RATE_LIMIT_WINDOW - (now - attempts.lastAttempt)) / 60000);
+    return res.status(429).json({ error: `Çok fazla hatalı deneme. Lütfen ${waitTime} dakika bekleyin.` });
+  }
+
   const { password } = req.body;
   if (password === ADMIN_PASSWORD) {
+    loginAttempts.delete(ip); // Reset on success
     res.json({ success: true, token: AUTH_TOKEN });
   } else {
+    // Record failed attempt
+    attempts.count++;
+    attempts.lastAttempt = now;
+    loginAttempts.set(ip, attempts);
+
     res.status(401).json({ success: false, error: 'Hatalı şifre' });
   }
 });
