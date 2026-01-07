@@ -233,6 +233,19 @@
                 </div>
                 <button id="btnSaveOverride" class="btn" style="width: 100%;">Eşleştirmeyi Kaydet</button>
             </div>
+
+            <div class="card">
+                <div class="card-title">🔍 Stok Müfettişi</div>
+                <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Bir ürün kodu girerek Hamurlabs ve
+                    Shopify stoklarını detaylı kıyaslayın.</p>
+                <div class="input-group">
+                    <input type="text" id="inspectCode" placeholder="Ürün Kodu Girin (Örn: B00041)">
+                </div>
+                <button id="btnInspect" class="btn" style="width: 100%;">Stok Sorgula</button>
+                <div id="inspectorResult" style="margin-top: 1.5rem; display: none;">
+                    <!-- Comparative Table injected by admin.js -->
+                </div>
+            </div>
         </div>
 
         <div class="card" style="margin-bottom: 2rem;">
