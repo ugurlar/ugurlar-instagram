@@ -752,7 +752,8 @@ body::before {
 .shopify-top-badge {
   margin-bottom: 0.5rem;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
+  /* Centered as requested */
 }
 
 /* Skeleton Loading */

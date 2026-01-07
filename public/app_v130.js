@@ -27,7 +27,7 @@ const resultCount = document.getElementById('resultCount');
 const emptyState = document.getElementById('emptyState');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.29-GOLD (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.30-GOLD (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -376,7 +376,7 @@ async function loadShopifyStatus(products) {
                   <div style="font-size: 1.65rem; font-weight: 800; color: #ef4444; line-height: 1;">
                     ${currentPrice.toLocaleString('tr-TR')} ${currency}
                   </div>
-                  <div style="font-size: 10px; color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                  <div style="font-size: 10px; color: var(--success); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 4px;">
                     <span style="display:inline-block; width:6px; height:6px; background:var(--success); border-radius:50%; box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite;"></span>
                     Shopify Canlı Fiyat
                   </div>
@@ -453,7 +453,7 @@ async function loadShopifyStatus(products) {
                       }
 
                       stockCell.innerHTML = `
-                        <div style="display: flex; align-items: center; justify-content: flex-start; gap: 4px;">
+                        <div style="display: flex; align-items: center; justify-content: center; gap: 4px;">
                           <span class="${qty > 0 ? 'text-green' : 'text-red'}" style="font-weight: 700;">
                             ${qty} Adet
                           </span>
@@ -978,4 +978,4 @@ window.copyToClipboard = function (text) {
 }
 
 // Initialize
-console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.29-GOLD');
+console.log('🚀 Hamurlabs Product Panel loaded with Global Cache - v1.30-GOLD');
