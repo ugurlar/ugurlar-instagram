@@ -23,7 +23,7 @@ const closeSidebarBtn = document.getElementById('closeSidebar');
 const sidebarContent = document.getElementById('sidebarContent');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.22 (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.23 (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
@@ -285,16 +285,26 @@ async function loadShopifyStatus(products) {
           const priceContainer = card?.querySelector('.price-display');
 
           if (priceContainer) {
-            console.log(`💰 Fiyat güncelleniyor: ${code} -> ${data.price}`);
+            // Helper to get Shopify variant option by name (robust)
+            const getOpt = (v, names) => {
+              if (!v.options) return null;
+              for (const name of names) {
+                if (v.options[name]) return v.options[name].trim();
+                const found = Object.keys(v.options).find(k => k.toLowerCase().replace(/\s/g, '') === name.toLowerCase());
+                if (found) return v.options[found].trim();
+              }
+              return null;
+            };
+
             const currentPrice = parseFloat(data.price);
             const comparePrice = data.compareAtPrice ? parseFloat(data.compareAtPrice) : null;
-            const hamurlabsPrice = parseFloat(product.selling_price);
+            const hamurlabsPrice = getParsedPrice(product.selling_price);
             const currency = data.currency || 'TL';
 
             if (!isNaN(currentPrice)) {
               let html = '';
 
-              if (!isNaN(hamurlabsPrice) && Math.abs(hamurlabsPrice - currentPrice) > 1) {
+              if (hamurlabsPrice > 0 && Math.abs(hamurlabsPrice - currentPrice) > 1) {
                 html += `<div class="price-row store-price" style="opacity: 0.6; font-size: 0.8em; text-decoration: line-through; margin-bottom: 2px;">
                             Mağaza: ${hamurlabsPrice.toLocaleString('tr-TR')} ${currency}
                           </div>`;
@@ -339,17 +349,8 @@ async function loadShopifyStatus(products) {
 
                   // 2. Level 2: Size + Color Match
                   if (!row && sv.options) {
-                    const getOpt = (names) => {
-                      for (const name of names) {
-                        if (sv.options[name]) return sv.options[name].trim();
-                        const found = Object.keys(sv.options).find(k => k.toLowerCase().replace(/\s/g, '') === name.toLowerCase());
-                        if (found) return sv.options[found].trim();
-                      }
-                      return null;
-                    };
-
-                    const size = getOpt(['Size', 'Beden', 'Option1', 'Option2', 'Size/Quantity', 'Beden/Stok']);
-                    const svColor = (getOpt(['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
+                    const size = getOpt(sv, ['Size', 'Beden', 'Option1', 'Option2', 'Size/Quantity', 'Beden/Stok']);
+                    const svColor = (getOpt(sv, ['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
 
                     if (size) {
                       const rows = card?.querySelectorAll('.stock-table tbody tr');
@@ -377,7 +378,7 @@ async function loadShopifyStatus(products) {
 
                     // LIVE COLOR POPULATION: If table says "-", try to use Shopify color
                     if (colorCell && (!colorCell.textContent || colorCell.textContent.trim() === '-')) {
-                      const svColor = (getOpt(['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
+                      const svColor = (getOpt(sv, ['Color', 'Renk', 'Option1', 'Option2', 'Renk/Desen']) || '').toLowerCase();
                       if (svColor) colorCell.innerHTML = `<span style="text-transform: capitalize;">${svColor}</span>`;
                     }
 
