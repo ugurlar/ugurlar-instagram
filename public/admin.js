@@ -34,7 +34,7 @@ async function adminFetch(url, options = {}) {
     return response;
 }
 
-// Load Data
+// Load Data (Diagnostics)
 async function loadDiagnostics() {
     try {
         const resp = await adminFetch('/api/admin/diagnostics');
@@ -65,7 +65,7 @@ async function loadDiagnostics() {
         `).join('') || '<tr><td colspan="4" style="text-align:center;">Günlük temiz.</td></tr>';
 
     } catch (err) {
-        showToast('Veriler alınamadı: ' + err.message, 'error');
+        console.error('Diagnostic error:', err);
     }
 }
 
@@ -78,20 +78,16 @@ function prepareOverride(code) {
 btnRefreshData.addEventListener('click', loadDiagnostics);
 
 btnSyncHamur.addEventListener('click', async () => {
-    if (!confirm('Tüm ürünlerin senkronizasyonunu tetiklemek istiyor musunuz? (Bu işlem birkaç dakika sürebilir)')) return;
-
+    if (!confirm('Tüm ürünlerin senkronizasyonunu tetiklemek istiyor musunuz?')) return;
     btnSyncHamur.disabled = true;
-    btnSyncHamur.textContent = '⌛ Senkronize ediliyor...';
-
     try {
-        const resp = await adminFetch('/api/cron'); // Trigger standard sync
+        const resp = await adminFetch('/api/cron');
         const data = await resp.json();
         showToast(`Başarılı! ${data.count || 0} ürün güncellendi.`, 'success');
     } catch (err) {
         showToast('Hata: ' + err.message, 'error');
     } finally {
         btnSyncHamur.disabled = false;
-        btnSyncHamur.textContent = '🔄 Hamurlabs Senkronizasyonu Tetikle';
         loadDiagnostics();
     }
 });
@@ -99,11 +95,7 @@ btnSyncHamur.addEventListener('click', async () => {
 btnSaveOverride.addEventListener('click', async () => {
     const hamur_code = document.getElementById('mapHamurCode').value.trim();
     const shopify_handle = document.getElementById('mapShopifyHandle').value.trim();
-
-    if (!hamur_code || !shopify_handle) {
-        showToast('Tüm alanları doldurun', 'warning');
-        return;
-    }
+    if (!hamur_code || !shopify_handle) return showToast('Eksik alan var', 'warning');
 
     try {
         const resp = await adminFetch('/api/admin/match-override', {
@@ -112,11 +104,7 @@ btnSaveOverride.addEventListener('click', async () => {
         });
         if (resp.ok) {
             showToast('Eşleştirme kaydedildi!', 'success');
-            document.getElementById('mapHamurCode').value = '';
-            document.getElementById('mapShopifyHandle').value = '';
             loadDiagnostics();
-        } else {
-            throw new Error('Kaydedilemedi');
         }
     } catch (err) {
         showToast(err.message, 'error');
@@ -128,50 +116,35 @@ btnInspect.addEventListener('click', () => {
     if (code) inspectProduct(code);
 });
 
-inspectCodeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        const code = inspectCodeInput.value.trim();
-        if (code) inspectProduct(code);
-    }
-});
-
 async function inspectProduct(code) {
     inspectorResult.style.display = 'block';
-    inspectorResult.innerHTML = '<div style="text-align:center; padding:1rem;">📡 Veriler sorgulanıyor...</div>';
-
+    inspectorResult.innerHTML = '<div style="text-align:center; padding:1rem;">📡 Sorgulanıyor...</div>';
     try {
-        // 1. Fetch Hamurlabs (via Search API which hits Supabase)
         const hamurResp = await adminFetch(`/api/products/search?code=${encodeURIComponent(code)}`);
         const hamurData = await hamurResp.json();
         const hamurProduct = (hamurData.data || []).find(p => p.code === code) || (hamurData.data || [])[0];
 
-        // 2. Fetch Shopify
         const shopifyResp = await adminFetch(`/api/shopify-product?code=${encodeURIComponent(code)}`);
         const shopifyData = await shopifyResp.json();
 
         if (!hamurProduct) {
-            inspectorResult.innerHTML = `<div style="color:var(--error); padding:1rem;">❌ Hamurlabs'te "${code}" kodu bulunamadı.</div>`;
+            inspectorResult.innerHTML = `<div style="color:var(--error); padding:1rem;">❌ Hamurlabs'te bulunamadı.</div>`;
             return;
         }
 
         const variants = mergeVariants(hamurProduct, shopifyData);
         renderInspectorTable(code, hamurProduct, shopifyData, variants);
-
     } catch (err) {
-        inspectorResult.innerHTML = `<div style="color:var(--error); padding:1rem;">Hata: ${err.message}</div>`;
+        inspectorResult.innerHTML = 'Hata: ' + err.message;
     }
 }
 
 function mergeVariants(hamur, shopify) {
     const map = new Map();
-
-    // Process Hamurlabs
     (hamur.metas || []).forEach(v => {
         const size = v.value || v.size || '?';
         map.set(size, { size, hamurStock: parseInt(v.quantity) || 0, shopifyStock: 0, status: 'missing_in_shopify' });
     });
-
-    // Process Shopify
     if (shopify.found && shopify.variants) {
         shopify.variants.forEach(sv => {
             const size = sv.options.Size || sv.options.Beden || sv.options.Option1 || '?';
@@ -184,71 +157,100 @@ function mergeVariants(hamur, shopify) {
             }
         });
     }
-
     return Array.from(map.values());
 }
 
 function renderInspectorTable(code, hamur, shopify, variants) {
-    const shopifyStatus = shopify.found ? `<span style="color:var(--success)">✅ Bağlı: ${shopify.handle}</span>` : `<span style="color:var(--error)">❌ Bağlı Değil</span>`;
-
-    let html = `
-        <div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:1rem; font-size:0.9rem;">
-                <span><strong>Hamurlabs:</strong> ${hamur.name}</span>
-                <span><strong>Shopify:</strong> ${shopifyStatus}</span>
-            </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Beden</th>
-                        <th style="text-align:center;">Hamurlabs</th>
-                        <th style="text-align:center;">Shopify</th>
-                        <th>Durum</th>
-                    </tr>
-                </thead>
-                <tbody>
-    `;
-
+    const shopifyStatus = shopify.found ? `<span style="color:var(--success)">✅ Bağlı</span>` : `<span style="color:var(--error)">❌ Bağlı Değil</span>`;
+    let html = `<div style="margin-top:1rem; border-top:1px solid var(--border); padding-top:1rem;">
+        <div style="font-size:0.8rem; margin-bottom:0.5rem;">${hamur.name} | ${shopifyStatus}</div>
+        <table><thead><tr><th>Beden</th><th style="text-align:center;">H.labs</th><th style="text-align:center;">Shopify</th><th>Durum</th></tr></thead><tbody>`;
     variants.forEach(v => {
-        let statusHtml = '';
-        if (v.status === 'match') statusHtml = '<span style="color:var(--success)">✅ Tamam</span>';
-        else if (v.status === 'mismatch') statusHtml = '<span style="color:var(--warning)">⚠️ Farklı</span>';
-        else if (v.status === 'missing_in_shopify') statusHtml = '<span style="color:var(--error)">❓ Shopify\'da Yok</span>';
-        else statusHtml = '<span style="color:var(--text-muted)">❓ Panelde Yok</span>';
-
-        html += `
-            <tr>
-                <td><strong>${v.size}</strong></td>
-                <td style="text-align:center; font-weight:600;">${v.hamurStock}</td>
-                <td style="text-align:center; font-weight:600;">${v.shopifyStock}</td>
-                <td style="font-size:0.75rem;">${statusHtml}</td>
-            </tr>
-        `;
+        const st = v.status === 'match' ? '✅' : (v.status === 'mismatch' ? '⚠️' : '❓');
+        html += `<tr><td>${v.size}</td><td style="text-align:center;">${v.hamurStock}</td><td style="text-align:center;">${v.shopifyStock}</td><td>${st}</td></tr>`;
     });
-
-    html += `
-                </tbody>
-            </table>
-            ${!shopify.found ? `
-                <div style="margin-top:1rem;">
-                    <button class="btn btn-secondary" style="width:100%; font-size:0.8rem;" onclick="prepareOverride('${code}')">🔗 Bu Ürünü Manuel Eşle</button>
-                </div>
-            ` : ''}
-        </div>
-    `;
-
+    html += `</tbody></table></div>`;
     inspectorResult.innerHTML = html;
 }
 
-// Toast Helper
+// --- GLOBAL AUDIT LOGIC ---
+let fullAuditData = [];
+let onlyMismatches = false;
+
+btnStartAudit.addEventListener('click', runGlobalAudit);
+btnFilterMismatches.addEventListener('click', toggleAuditFilter);
+
+async function runGlobalAudit() {
+    btnStartAudit.disabled = true;
+    btnStartAudit.textContent = '⌛ Tarama Başladı...';
+    auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Ürünler alınıyor...</td></tr>';
+    try {
+        const resp = await adminFetch('/api/products/search?code=');
+        const data = await resp.json();
+        const products = data.data || [];
+        if (products.length === 0) {
+            auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Ürün yok.</td></tr>';
+            return;
+        }
+        fullAuditData = [];
+        auditBody.innerHTML = '';
+        for (let i = 0; i < products.length; i++) {
+            const p = products[i];
+            const rowId = `audit-row-${p.code.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            auditBody.insertAdjacentHTML('beforeend', `<tr id="${rowId}"><td><strong>${p.code}</strong></td><td class="text-muted">${p.name.substring(0, 20)}...</td><td colspan="3" style="text-align:center;">⌛...</td></tr>`);
+            try {
+                const sResp = await fetch(`/api/shopify-product?code=${encodeURIComponent(p.code)}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                const sData = await sResp.json();
+                const result = calculateAuditScore(p, sData);
+                fullAuditData.push(result);
+                updateAuditRow(rowId, result);
+                if (i % 5 === 0) await new Promise(r => setTimeout(r, 200));
+            } catch (e) { console.error(e); }
+        }
+    } catch (err) { showToast(err.message, 'error'); }
+    finally { btnStartAudit.disabled = false; btnStartAudit.textContent = 'Raporu Başlat'; }
+}
+
+function calculateAuditScore(hamur, shopify) {
+    const hamurStock = (hamur.metas || []).reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0);
+    const shopifyStock = shopify.found ? (shopify.variants || []).reduce((sum, v) => sum + (parseInt(v.inventory) || 0), 0) : 0;
+    let status = 'match';
+    if (!shopify.found) status = 'not_mapped';
+    else if (hamurStock !== shopifyStock) status = 'mismatch';
+    return { code: hamur.code, name: hamur.name, hamurStock, shopifyStock, status, shopifyFound: shopify.found };
+}
+
+function updateAuditRow(rowId, result) {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const color = result.status === 'match' ? '#22c55e' : (result.status === 'mismatch' ? '#f59e0b' : '#ef4444');
+    const label = result.status === 'match' ? '✅ Eşleşiyor' : (result.status === 'mismatch' ? '⚠️ Farklı' : '❓ Yok');
+    row.innerHTML = `<td style="font-weight:700;">${result.code}</td><td>${result.name}</td><td style="text-align:center;">${result.hamurStock}</td><td style="text-align:center;">${result.shopifyFound ? result.shopifyStock : '-'}</td><td style="text-align:center;"><span style="color:${color}; font-size:0.75rem;">${label}</span></td>`;
+    if (result.status !== 'match') {
+        row.style.cursor = 'pointer';
+        row.onclick = () => { inspectCodeInput.value = result.code; inspectProduct(result.code); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+    }
+}
+
+function toggleAuditFilter() {
+    onlyMismatches = !onlyMismatches;
+    btnFilterMismatches.textContent = onlyMismatches ? 'Tümünü Göster' : 'Sadece Hataları Göster';
+    const rows = auditBody.querySelectorAll('tr');
+    rows.forEach((row, index) => {
+        const data = fullAuditData[index];
+        if (data && onlyMismatches && data.status === 'match') row.style.display = 'none';
+        else row.style.display = '';
+    });
+}
+
 function showToast(msg, type = 'info') {
     const t = document.getElementById('toast');
+    if (!t) return;
     t.textContent = msg;
     t.style.background = type === 'success' ? 'var(--success)' : (type === 'error' ? 'var(--error)' : 'var(--primary)');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-// Initial Load
 loadDiagnostics();
-setInterval(loadDiagnostics, 30000); // Auto refresh every 30s
+setInterval(loadDiagnostics, 60000);
