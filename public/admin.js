@@ -223,9 +223,21 @@ function calculateAuditScore(hamur, shopify) {
 function updateAuditRow(rowId, result) {
     const row = document.getElementById(rowId);
     if (!row) return;
+
+    // Set status as data attribute for easy filtering
+    row.setAttribute('data-status', result.status);
+
     const color = result.status === 'match' ? '#22c55e' : (result.status === 'mismatch' ? '#f59e0b' : '#ef4444');
     const label = result.status === 'match' ? '✅ Eşleşiyor' : (result.status === 'mismatch' ? '⚠️ Farklı' : '❓ Yok');
-    row.innerHTML = `<td style="font-weight:700;">${result.code}</td><td>${result.name}</td><td style="text-align:center;">${result.hamurStock}</td><td style="text-align:center;">${result.shopifyFound ? result.shopifyStock : '-'}</td><td style="text-align:center;"><span style="color:${color}; font-size:0.75rem;">${label}</span></td>`;
+
+    row.innerHTML = `
+        <td style="font-weight:700;">${result.code}</td>
+        <td>${result.name}</td>
+        <td style="text-align:center; font-weight:600;">${result.hamurStock}</td>
+        <td style="text-align:center; font-weight:600;">${result.shopifyFound ? result.shopifyStock : '-'}</td>
+        <td style="text-align:center;"><span style="color:${color}; font-size:0.75rem; font-weight:700;">${label}</span></td>
+    `;
+
     if (result.status !== 'match') {
         row.style.cursor = 'pointer';
         row.onclick = () => { inspectCodeInput.value = result.code; inspectProduct(result.code); window.scrollTo({ top: 0, behavior: 'smooth' }); };
@@ -235,11 +247,15 @@ function updateAuditRow(rowId, result) {
 function toggleAuditFilter() {
     onlyMismatches = !onlyMismatches;
     btnFilterMismatches.textContent = onlyMismatches ? 'Tümünü Göster' : 'Sadece Hataları Göster';
+
     const rows = auditBody.querySelectorAll('tr');
-    rows.forEach((row, index) => {
-        const data = fullAuditData[index];
-        if (data && onlyMismatches && data.status === 'match') row.style.display = 'none';
-        else row.style.display = '';
+    rows.forEach(row => {
+        const status = row.getAttribute('data-status');
+        if (onlyMismatches && status === 'match') {
+            row.style.display = 'none';
+        } else {
+            row.style.display = '';
+        }
     });
 }
 
