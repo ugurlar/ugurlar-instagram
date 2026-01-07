@@ -751,8 +751,11 @@ body::before {
 
 .shopify-top-badge {
   position: absolute;
-  top: 1.5rem;
-  right: 1.5rem;
+  top: 8px;
+  right: 8px;
+  z-index: 50;
+  /* Ensure it stays on top of the image */
+  pointer-events: none;
 }
 
 /* Skeleton Loading */
@@ -1423,11 +1426,12 @@ body::before {
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  margin-left: 1.25rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
+  min-width: max-content;
   backdrop-filter: blur(10px);
 }
 
@@ -1438,10 +1442,7 @@ body::before {
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
-.btn-logout::before {
-  content: '🔒';
-  font-size: 1rem;
-}
+/* Lock icon removed as requested */
 
 @keyframes fadeInDown {
   from {
