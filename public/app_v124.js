@@ -5,29 +5,96 @@
 // Global Cache for Products (Veri kaybını önlemek için)
 window.pageProducts = {};
 
-// DOM Elements
-const searchForm = document.getElementById('searchForm');
-const searchInput = document.getElementById('searchInput');
-const loadingEl = document.getElementById('loading');
-const errorEl = document.getElementById('error');
-const errorText = document.getElementById('errorText');
-const resultsSection = document.getElementById('results');
-const productList = document.getElementById('productList');
-const resultCount = document.getElementById('resultCount');
-const emptyState = document.getElementById('emptyState');
+// Auth State
+let isLoggedIn = !!localStorage.getItem('ugurlar_token');
+let authToken = localStorage.getItem('ugurlar_token');
 
-// Sidebar Elements
-const historySidebar = document.getElementById('historySidebar');
-const toggleSidebarBtn = document.getElementById('toggleSidebar');
-const closeSidebarBtn = document.getElementById('closeSidebar');
-const sidebarContent = document.getElementById('sidebarContent');
+// Auth DOM Elements
+const authOverlay = document.getElementById('auth-overlay');
+const loginForm = document.getElementById('loginForm');
+const loginPassword = document.getElementById('loginPassword');
+const logoutBtn = document.getElementById('logoutBtn');
 
 // API Base URL
-console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.23 (Live Stock Engine) Yüklendi");
+console.log("🚀 Ugurlar Instagram Envanter Paneli - v1.24-AUTH (Live Stock Engine) Yüklendi");
 
 const API_BASE = '';
 
-// Event Listeners
+// Auth Request Wrapper
+async function authFetch(url, options = {}) {
+  const headers = {
+    ...options.headers,
+    'Authorization': `Bearer ${authToken}`
+  };
+
+  const response = await fetch(url, { ...options, headers });
+
+  if (response.status === 401) {
+    handleUnauthorized();
+    throw new Error('Oturum süresi doldu veya yetkisiz erişim.');
+  }
+
+  return response;
+}
+
+function handleUnauthorized() {
+  isLoggedIn = false;
+  authToken = null;
+  localStorage.removeItem('ugurlar_token');
+  showLogin();
+}
+
+function showLogin() {
+  authOverlay.style.display = 'flex';
+  logoutBtn.style.display = 'none';
+}
+
+function hideLogin() {
+  authOverlay.style.display = 'none';
+  logoutBtn.style.display = 'inline-block';
+}
+
+// Check initial auth
+if (!isLoggedIn) {
+  showLogin();
+} else {
+  hideLogin();
+}
+
+// Auth Handlers
+if (loginForm) {
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const password = loginPassword.value;
+    try {
+      const resp = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      });
+      const data = await resp.json();
+      if (data.success) {
+        authToken = data.token;
+        localStorage.setItem('ugurlar_token', authToken);
+        isLoggedIn = true;
+        hideLogin();
+        showToast('Başarıyla giriş yapıldı', 'success');
+      } else {
+        showToast('Hatalı şifre!', 'error');
+      }
+    } catch (err) {
+      showToast('Giriş yapılamadı', 'error');
+    }
+  });
+}
+
+if (logoutBtn) {
+  logoutBtn.addEventListener('click', () => {
+    handleUnauthorized();
+    showToast('Çıkış yapıldı', 'info');
+  });
+}
+
 // Event Listeners
 searchForm.addEventListener('submit', handleSearch);
 
@@ -104,7 +171,7 @@ async function handleSearch(e) {
 // API Functions
 async function searchProducts(query) {
   // Yeni Backend Cache sistemi uzerinden arama yapiyoruz
-  const response = await fetch(`${API_BASE}/api/products/search?code=${encodeURIComponent(query)}`);
+  const response = await authFetch(`${API_BASE}/api/products/search?code=${encodeURIComponent(query)}`);
 
   if (!response.ok) {
     const error = await response.json();
@@ -117,7 +184,7 @@ async function searchProducts(query) {
 
 async function fetchStock() {
   try {
-    const response = await fetch(`${API_BASE}/api/stock`);
+    const response = await authFetch(`${API_BASE}/api/stock`);
     if (!response.ok) return {};
     const data = await response.json();
     return data.results || data;
@@ -260,7 +327,7 @@ async function loadShopifyStatus(products) {
     if (!badgeContainer || !actionContainer) continue;
 
     try {
-      const response = await fetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(code)}`);
+      const response = await authFetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(code)}`);
       const data = await response.json();
 
       if (data.found && data.url) {
@@ -531,7 +598,7 @@ window.generateAIText = async function (productCode) {
   document.body.appendChild(overlay);
 
   try {
-    const response = await fetch(`${API_BASE}/api/generate-text`, {
+    const response = await authFetch(`${API_BASE}/api/generate-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -632,7 +699,7 @@ window.generateCombinedAIText = async function () {
   document.body.appendChild(overlay);
 
   try {
-    const response = await fetch(`${API_BASE}/api/generate-text`, {
+    const response = await authFetch(`${API_BASE}/api/generate-text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ products: preparedProducts })
@@ -712,7 +779,7 @@ function createSlug(text) {
 // Utility: Get Product URL from Backend (Shopify API)
 async function fetchProductUrl(productCode, productName) {
   try {
-    const response = await fetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(productCode)}`);
+    const response = await authFetch(`${API_BASE}/api/shopify-product?code=${encodeURIComponent(productCode)}`);
     const data = await response.json();
     if (data.found && data.url) {
       return data.url;
@@ -836,7 +903,7 @@ function hideAll() {
 // Recent Products Logic
 async function fetchRecentProducts() {
   try {
-    const response = await fetch(`${API_BASE}/api/products?limit=10`);
+    const response = await authFetch(`${API_BASE}/api/products?limit=10`);
     if (!response.ok) throw new Error('Failed to fetch recent products');
 
     const data = await response.json();
@@ -964,7 +1031,7 @@ async function showSystemStatus() {
   document.body.appendChild(modal);
 
   try {
-    const response = await fetch(`${API_BASE}/api/system-status`);
+    const response = await authFetch(`${API_BASE}/api/system-status`);
     const logs = await response.json();
     const contentDiv = document.getElementById('status-content');
 

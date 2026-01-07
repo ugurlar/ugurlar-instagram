@@ -6,6 +6,30 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'ugurlar2026';
+
+// Simple static token for the session (in a real app, use JWT or sessions)
+const AUTH_TOKEN = Buffer.from(ADMIN_PASSWORD).toString('base64');
+
+// AUTH MIDDLEWARE
+const authenticate = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader === `Bearer ${AUTH_TOKEN}`) {
+    next();
+  } else {
+    res.status(401).json({ error: 'Yetkisiz erişim. Lütfen giriş yapın.' });
+  }
+};
+
+// LOGIN ENDPOINT
+app.post('/api/auth/login', (req, res) => {
+  const { password } = req.body;
+  if (password === ADMIN_PASSWORD) {
+    res.json({ success: true, token: AUTH_TOKEN });
+  } else {
+    res.status(401).json({ success: false, error: 'Hatalı şifre' });
+  }
+});
 
 // Middleware
 app.use(cors());
@@ -189,7 +213,7 @@ function formatDateForAPI(date) {
 // ==========================================
 
 // 1. Ürün Listesi (Supabase'den)
-app.get('/api/products', async (req, res) => {
+app.get('/api/products', authenticate, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
 
@@ -218,7 +242,7 @@ app.get('/api/products', async (req, res) => {
 });
 
 // 2. Arama (Supabase Full Text Search)
-app.get('/api/products/search', async (req, res) => {
+app.get('/api/products/search', authenticate, async (req, res) => {
   try {
     const { code } = req.query;
     const query = (code || '').trim();
@@ -285,7 +309,7 @@ app.get('/api/products/search', async (req, res) => {
 });
 
 // 3. Stok Kontrol (Canlı - Hamurlabs API)
-app.get('/api/stock', async (req, res) => {
+app.get('/api/stock', authenticate, async (req, res) => {
   try {
     const { barcode } = req.query;
     const params = barcode ? { barcode } : {};
@@ -418,7 +442,7 @@ async function getShopifyProductHandle(sku) {
 }
 
 // 3.5 Shopify Product Link Endpoint
-app.get('/api/shopify-product', async (req, res) => {
+app.get('/api/shopify-product', authenticate, async (req, res) => {
   const { code } = req.query;
   if (!code) return res.status(400).json({ error: 'Urun kodu gerekli' });
 
@@ -465,7 +489,7 @@ app.get('/api/shopify-product', async (req, res) => {
 });
 
 // 4. AI Metin Üretimi (Gelişmiş Fallback Mekanizması)
-app.post('/api/generate-text', async (req, res) => {
+app.post('/api/generate-text', authenticate, async (req, res) => {
   try {
     const { product, products } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
@@ -606,7 +630,7 @@ app.get('/api/cron', async (req, res) => {
 });
 
 // 6. Sistem Durumu (Cron Geçmişi)
-app.get('/api/system-status', async (req, res) => {
+app.get('/api/system-status', authenticate, async (req, res) => {
   try {
     const response = await supabaseAPI.get('/sync_history', {
       params: {
@@ -623,7 +647,7 @@ app.get('/api/system-status', async (req, res) => {
 });
 
 // 7. Manuel Senkronizasyon (Force Sync via Code)
-app.get('/api/force-sync', async (req, res) => {
+app.get('/api/force-sync', authenticate, async (req, res) => {
   try {
     const { code } = req.query;
     if (!code) return res.status(400).json({ error: 'Ürün kodu gerekli (code)' });

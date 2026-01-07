@@ -34,7 +34,8 @@
               <path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </button>
-          <span class="badge">v1.23-STABLE (Live Stock Engine)</span>
+          <span class="badge">v1.24-AUTH (Live Stock Engine)</span>
+          <button id="logoutBtn" class="btn-logout" style="display: none;">Çıkış Yap</button>
         </div>
       </div>
     </header>
@@ -114,10 +115,29 @@
       <div id="sidebarContent" class="sidebar-content">
         <!-- Compact Items will be injected here -->
       </div>
+      <!-- Login Overlay -->
+      <div id="auth-overlay" style="display: none;">
+        <div class="login-card">
+          <div class="login-logo">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path
+                d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            </svg>
+          </div>
+          <h2>Giriş Yap</h2>
+          <p>Lütfen devam etmek için şifreyi girin.</p>
+          <form id="loginForm">
+            <div class="login-input-group">
+              <input type="password" id="loginPassword" class="login-input" placeholder="••••••••" required>
+            </div>
+            <button type="submit" class="login-btn">Giriş Yap</button>
+          </form>
+        </div>
+      </div>
     </aside>
   </div>
 
-  <script src="app_v122.js"></script>
+  <script src="app_v124.js"></script>
 </body>
 
 </html>
