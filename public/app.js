@@ -201,7 +201,9 @@ function createProductCard(product, index = 0) {
              </div>
              <div class="product-title-group">
                 <h3 class="product-title">${escapeHtml(product.name || product.title || 'İsimsiz Ürün')}</h3>
-                <div class="product-price">${price}</div>
+                <div class="price-display" id="price-display-${escapeHtml(code)}">
+                  <div class="price-main">${price}</div>
+                </div>
                 
                 <div class="shopify-action-group" id="shopify-action-${escapeHtml(code)}">
                     <button class="btn-premium btn-shopify" disabled>
@@ -278,40 +280,45 @@ async function loadShopifyStatus(products) {
         // UPDATE PRICE: Shopify'dan gelen güncel fiyatı göster (İndirim varsa üstü çizili)
         if (data.price) {
           const card = badgeContainer.closest('.product-card');
-          const priceContainer = card?.querySelector('.product-title-group .product-price');
+          const priceContainer = card?.querySelector('.price-display');
 
           if (priceContainer) {
             console.log(`💰 Fiyat güncelleniyor: ${code} -> ${data.price}`);
-            let priceHtml = '';
             const currentPrice = parseFloat(data.price);
             const comparePrice = data.compareAtPrice ? parseFloat(data.compareAtPrice) : null;
+            const hamurlabsPrice = parseFloat(product.selling_price);
             const currency = data.currency || 'TL';
 
             if (!isNaN(currentPrice)) {
-              if (comparePrice && !isNaN(comparePrice) && comparePrice > currentPrice) {
-                priceHtml = `
-                  <span class="price-original" style="text-decoration: line-through; opacity: 0.6; font-size: 0.9em; margin-right: 8px;">
-                    ${comparePrice.toLocaleString('tr-TR')} ${currency}
-                  </span>
-                  <span class="price-discounted" style="color: #ef4444; font-weight: bold;">
-                    ${currentPrice.toLocaleString('tr-TR')} ${currency}
-                  </span>
-                `;
-              } else {
-                priceHtml = `${currentPrice.toLocaleString('tr-TR')} ${currency}`;
+              let html = '';
+
+              if (!isNaN(hamurlabsPrice) && Math.abs(hamurlabsPrice - currentPrice) > 1) {
+                html += `<div class="price-row store-price" style="opacity: 0.6; font-size: 0.8em; text-decoration: line-through; margin-bottom: 2px;">
+                            Mağaza: ${hamurlabsPrice.toLocaleString('tr-TR')} ${currency}
+                          </div>`;
+              } else if (comparePrice && !isNaN(comparePrice) && comparePrice > currentPrice) {
+                html += `<div class="price-row store-price" style="opacity: 0.6; font-size: 0.8em; text-decoration: line-through; margin-bottom: 2px;">
+                            Liste: ${comparePrice.toLocaleString('tr-TR')} ${currency}
+                          </div>`;
               }
 
-              priceContainer.innerHTML = `
-                <div style="display: flex; flex-direction: column; gap: 2px;">
-                  <div style="display: flex; align-items: center;">${priceHtml}</div>
-                  <div style="font-size: 10px; color: var(--success); font-weight: 500;">✨ Shopify Canlı Fiyat</div>
+              html += `
+                <div class="price-row shopify-price" style="display: flex; flex-direction: column; gap: 0px;">
+                  <div style="font-size: 1.65rem; font-weight: 800; color: #ef4444; line-height: 1;">
+                    ${currentPrice.toLocaleString('tr-TR')} ${currency}
+                  </div>
+                  <div style="font-size: 10px; color: var(--success); font-weight: 600; display: flex; align-items: center; gap: 4px; margin-top: 4px;">
+                    <span style="display:inline-block; width:6px; height:6px; background:var(--success); border-radius:50%; box-shadow: 0 0 8px var(--success); animation: pulse 2s infinite;"></span>
+                    Shopify Canlı Fiyat
+                  </div>
                 </div>
               `;
 
-              // Cache update
-              product.selling_price = data.price;
-              product.shopifyPrice = data.price;
-              product.shopifyComparePrice = data.compareAtPrice;
+              priceContainer.innerHTML = html;
+
+              product.shopifyPrice = currentPrice;
+              product.shopifyComparePrice = comparePrice;
+              product.hasShopifyDiscount = true;
             }
           }
         }
@@ -398,7 +405,11 @@ window.generateAIText = async function (productCode) {
   const name = product.name || product.title;
   const brand = product.brand || product.options?.Marka || '-';
   const color = product.options?.['Ana Renk'] || product.color || '-';
-  const price = product.selling_price;
+
+  const storePriceNum = getParsedPrice(product.selling_price);
+  const shopifyPriceNum = getParsedPrice(product.shopifyPrice);
+  const price = (shopifyPriceNum > 0 && shopifyPriceNum < storePriceNum) ? `${shopifyPriceNum} TL` : `${storePriceNum} TL`;
+
   const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
   const variants = product.metas || [];
 
@@ -498,7 +509,9 @@ window.generateCombinedAIText = async function () {
     const name = product.name || product.title;
     const brand = product.brand || product.options?.Marka || '-';
     const color = product.options?.['Ana Renk'] || product.color || '-';
-    const price = product.selling_price;
+    const storePriceNum = getParsedPrice(product.selling_price);
+    const shopifyPriceNum = getParsedPrice(product.shopifyPrice);
+    const price = (shopifyPriceNum > 0 && shopifyPriceNum < storePriceNum) ? `${shopifyPriceNum} TL` : `${storePriceNum} TL`;
     const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
     const variants = product.metas || [];
 
@@ -548,72 +561,6 @@ window.generateCombinedAIText = async function () {
   }
 }
 
-// Combined AI Generator
-window.generateCombinedAIText = async function () {
-  const codes = window.currentResultCodes || [];
-  if (codes.length === 0) return;
-
-  const productsToProcess = codes.map(code => window.pageProducts[code]).filter(Boolean);
-
-  if (productsToProcess.length === 0) {
-    showToast('Ürün verisi bulunamadı', 'error');
-    return;
-  }
-
-  // Prepare data for AI
-  const preparedProducts = await Promise.all(productsToProcess.map(async (product) => {
-    const name = product.name || product.title;
-    const brand = product.brand || product.options?.Marka || '-';
-    const color = product.options?.['Ana Renk'] || product.color || '-';
-    const price = product.selling_price;
-    const category = (product.categories && product.categories[0]) || product.options?.['Ürün Grubu'] || '-';
-    const variants = product.metas || [];
-
-    // URL Creation
-    const url = await fetchProductUrl(product.code, name);
-
-    // Stock Status
-    let stockStatus = "Tükendi";
-    let availableSizes = [];
-    if (variants.length > 0) {
-      availableSizes = variants.filter(v => (parseInt(v.quantity) || 0) > 0).map(v => v.value || v.size || v.name);
-      if (availableSizes.length > 0) stockStatus = `Stokta Var (${availableSizes.join(', ')})`;
-    } else if (product.stockInfo && (product.stockInfo.quantity > 0)) {
-      stockStatus = "Stokta Var";
-    }
-
-    return { name, brand, color, price, category, stockStatus, sizes: availableSizes.join(', '), url };
-  }));
-
-  const loadingId = 'ai-loading-' + Date.now();
-  const overlay = document.createElement('div');
-  overlay.id = loadingId;
-  overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; display: flex; justify-content: center; align-items: center; flex-direction: column; color: white;';
-  overlay.innerHTML = `
-        <div style="font-size: 40px; margin-bottom: 20px;">✨</div>
-        <h3>Toplu Metin Hazırlanıyor...</h3>
-        <p>${preparedProducts.length} ürün analiz ediliyor.</p>
-    `;
-  document.body.appendChild(overlay);
-
-  try {
-    const response = await fetch(`${API_BASE}/api/generate-text`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products: preparedProducts })
-    });
-
-    const data = await response.json();
-    document.body.removeChild(overlay);
-
-    if (!response.ok) throw new Error(data.error || 'AI hatası');
-    showAIResult(data.text);
-
-  } catch (error) {
-    if (document.getElementById(loadingId)) document.body.removeChild(document.getElementById(loadingId));
-    showToast('Hata: ' + error.message, 'error');
-  }
-}
 
 function createStockTable(variants, stockInfo) {
   if (variants && variants.length > 0) {
@@ -644,6 +591,14 @@ function createStockTable(variants, stockInfo) {
   `;
   }
   return '<div class="no-stock-info">Detaylı stok bilgisi yok</div>';
+}
+
+// Utility: Parse Price to Number
+function getParsedPrice(p) {
+  if (!p) return 0;
+  if (typeof p === 'number') return p;
+  const num = parseFloat(String(p).replace(/[^\d.,]/g, '').replace(',', '.'));
+  return isNaN(num) ? 0 : num;
 }
 
 // Utility: Slugify for Shopify URL
@@ -688,8 +643,10 @@ window.copyProductInfo = async function (productCode) {
 
   const name = product.name || product.title;
   const brand = product.brand || product.options?.Marka || '-';
-  const color = product.options?.['Ana Renk'] || product.color || '-';
-  const price = product.selling_price ? product.selling_price + ' TL' : '-';
+  const storePriceNum = getParsedPrice(product.selling_price);
+  const shopifyPriceNum = getParsedPrice(product.shopifyPrice);
+  const finalPrice = (shopifyPriceNum > 0 && shopifyPriceNum < storePriceNum) ? shopifyPriceNum : storePriceNum;
+  const price = finalPrice ? finalPrice + ' TL' : '-';
   const variants = product.metas || [];
 
   // URL Creation (Async)
