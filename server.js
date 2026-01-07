@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
+const NodeCache = require('node-cache');
 require('dotenv').config();
 
 const app = express();
@@ -21,6 +23,21 @@ const MAX_ATTEMPTS = 10;
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Initialize Cache (expire in 10 minutes)
+const shopifyCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
+
+// SECURITY: Global Rate Limiting (100 requests per 15 minutes per IP)
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Çok fazla istek atıldı, lütfen 15 dakika sonra tekrar deneyin.' }
+});
+
+// Apply rate limiting to all API routes
+app.use('/api/', apiLimiter);
 
 // Basic Security Headers
 app.use((req, res, next) => {
@@ -104,6 +121,34 @@ const supabaseAPI = axios.create({
 // ==========================================
 // CORE FUNCTIONS
 // ==========================================
+
+// Global Logging Helper
+async function logSystemEvent(severity, message, context = {}) {
+  try {
+    await supabaseAPI.post('/system_logs', {
+      severity,
+      message,
+      context,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error(`🔴 Logging Failed [${severity}]:`, err.message);
+  }
+}
+
+// Mismatch Diagnostic Helper
+async function logMismatch(hamurCode, shopifyHandle, reason) {
+  try {
+    await supabaseAPI.post('/mismatch_diagnostics', {
+      hamur_code: hamurCode,
+      shopify_handle: shopifyHandle,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('🔴 Mismatch Logging Failed:', err.message);
+  }
+}
 
 async function makeStealthRequest(endpoint, params = {}) {
   const fakeDomain = 'https://monalure.hamurlabs.io';
@@ -367,7 +412,14 @@ async function getShopifyProductHandle(sku) {
   }
 
   // Temiz SKU (B00041 vs 2B00041 durumları için)
-  const cleanSku = sku.replace(/^2/, ''); // Başındaki 2'yi atıp dene (opsiyonel ama yaygın bir patern)
+  const cleanSku = sku.replace(/^2/, ''); // Başındaki 2'yi atıp dene
+
+  // Check Cache First
+  const cachedData = shopifyCache.get(sku);
+  if (cachedData) {
+    console.log(`⚡ Shopify Cache Hit: ${sku}`);
+    return cachedData;
+  }
 
   const query = `
     query($query: String!) {
@@ -465,6 +517,12 @@ async function getShopifyProductHandle(sku) {
     if (!bestMatch) {
       bestMatch = products[0].node;
       console.log(`ℹ️ Varsayılan eşleşme (ilk sonuç): ${bestMatch.handle}`);
+    }
+
+    if (bestMatch) {
+      shopifyCache.set(sku, bestMatch);
+    } else {
+      await logMismatch(sku, 'Not Found', 'SKU not found in Shopify search results');
     }
 
     return bestMatch;
