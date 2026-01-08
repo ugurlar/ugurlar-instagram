@@ -179,6 +179,8 @@ function renderInspectorTable(code, hamur, shopify, variants) {
 }
 
 // --- GLOBAL AUDIT LOGIC ---
+let fullAuditData = [];
+let onlyMismatches = false;
 let isAuditRunning = false;
 let stopAuditRequested = false;
 let totalToScan = 0;
@@ -288,7 +290,7 @@ function calculateAuditScore(hamur, shopify) {
     return { code: hamur.code, name: hamur.name, hamurStock, shopifyStock, status, shopifyFound: shopify.found };
 }
 
-function updateAuditRow(rowId, result) {
+function renderAuditRow(rowId, result) {
     const row = document.getElementById(rowId);
     if (!row) return;
 
