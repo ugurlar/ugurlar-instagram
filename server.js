@@ -294,22 +294,33 @@ function formatDateForAPI(date) {
 app.get('/api/products', authenticate, async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
 
-    // Direkt Supabase'den çek
+    // Direkt Supabase'den çek - Exact count ekleyerek toplam sayıyı öğreniyoruz
     const response = await supabaseAPI.get('/products', {
       params: {
         select: '*',
         limit: limit,
+        offset: offset,
         order: 'updated_at.desc'
+      },
+      headers: {
+        'Prefer': 'count=exact' // Toplam sayıyı header'da almak için
       }
     });
 
+    // Content-Range header'ından toplam sayıyı çek (Örn: 0-99/36979)
+    const contentRange = response.headers['content-range'];
+    const totalCount = contentRange ? parseInt(contentRange.split('/')[1]) : response.data.length;
+
     // Frontend'in beklediği format
-    const results = response.data.map(item => item.data || item); // item.data varsa onu, yoksa kendisini
+    const results = response.data.map(item => item.data || item);
 
     res.json({
-      total_count: results.length,
+      total_count: totalCount,
+      count: results.length,
       limit,
+      offset,
       data: results
     });
 

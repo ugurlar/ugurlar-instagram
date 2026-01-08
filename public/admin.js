@@ -17,8 +17,12 @@ const inspectCodeInput = document.getElementById('inspectCode');
 const inspectorResult = document.getElementById('inspectorResult');
 const auditBody = document.getElementById('auditBody');
 const btnStartAudit = document.getElementById('btnStartAudit');
+const btnStopAudit = document.getElementById('btnStopAudit');
 const btnExportCSV = document.getElementById('btnExportCSV');
 const btnFilterMismatches = document.getElementById('btnFilterMismatches');
+const progressWrapper = document.getElementById('progressWrapper');
+const progressBarFill = document.getElementById('progressBarFill');
+const progressStats = document.getElementById('progressStats');
 
 // Auth Fetch Wrapper
 async function adminFetch(url, options = {}) {
@@ -175,42 +179,104 @@ function renderInspectorTable(code, hamur, shopify, variants) {
 }
 
 // --- GLOBAL AUDIT LOGIC ---
-let fullAuditData = [];
-let onlyMismatches = false;
+let isAuditRunning = false;
+let stopAuditRequested = false;
+let totalToScan = 0;
+let scannedCount = 0;
 
-btnStartAudit.addEventListener('click', runGlobalAudit);
+btnStartAudit.addEventListener('click', runFullCatalogAudit);
+btnStopAudit.addEventListener('click', () => {
+    stopAuditRequested = true;
+    btnStopAudit.textContent = '🛑 Durduruluyor...';
+    btnStopAudit.disabled = true;
+});
 btnFilterMismatches.addEventListener('click', toggleAuditFilter);
 if (btnExportCSV) btnExportCSV.addEventListener('click', downloadAuditCSV);
 
-async function runGlobalAudit() {
+async function runFullCatalogAudit() {
+    if (isAuditRunning) return;
+
+    // Reset State
+    isAuditRunning = true;
+    stopAuditRequested = false;
+    fullAuditData = [];
+    scannedCount = 0;
+
+    // UI Setup
     btnStartAudit.disabled = true;
     btnStartAudit.textContent = '⌛ Tarama Başladı...';
-    auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Ürün listesi çekiliyor...</td></tr>';
+    btnStopAudit.style.display = 'inline-block';
+    btnStopAudit.textContent = '🛑 Durdur';
+    btnStopAudit.disabled = false;
+
+    progressWrapper.style.display = 'block';
+    progressBarFill.style.width = '0%';
+    progressStats.textContent = 'Hazırlanıyor...';
+
+    auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Katalog taranıyor...</td></tr>';
+
     try {
-        const resp = await adminFetch('/api/products?limit=100');
-        const data = await resp.json();
-        const products = data.data || [];
-        if (products.length === 0) {
-            auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Ürün bulunamadı.</td></tr>';
-            return;
+        await processAuditBatch(0);
+    } catch (err) {
+        showToast('Audit Hatası: ' + err.message, 'error');
+    } finally {
+        isAuditRunning = false;
+        btnStartAudit.disabled = false;
+        btnStartAudit.textContent = 'Raporu Yeniden Başlat';
+        btnStopAudit.style.display = 'none';
+
+        if (stopAuditRequested) {
+            showToast('Tarama durduruldu.', 'info');
+        } else {
+            showToast('Tüm katalog taraması tamamlandı!', 'success');
+            progressStats.textContent = `Tamamlandı: ${scannedCount} / ${totalToScan}`;
         }
-        fullAuditData = [];
-        auditBody.innerHTML = '';
-        for (let i = 0; i < products.length; i++) {
-            const p = products[i];
-            const rowId = `audit-row-${p.code.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            auditBody.insertAdjacentHTML('beforeend', `<tr id="${rowId}" class="row-animate"><td><strong>${p.code}</strong></td><td class="text-muted">${p.name.substring(0, 20)}...</td><td colspan="3" style="text-align:center;">⌛...</td></tr>`);
-            try {
-                const sResp = await fetch(`/api/shopify-product?code=${encodeURIComponent(p.code)}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
-                const sData = await sResp.json();
-                const result = calculateAuditScore(p, sData);
-                fullAuditData.push(result);
-                updateAuditRow(rowId, result);
-                if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
-            } catch (e) { console.error(e); }
-        }
-    } catch (err) { showToast(err.message, 'error'); }
-    finally { btnStartAudit.disabled = false; btnStartAudit.textContent = 'Raporu Başlat'; }
+    }
+}
+
+async function processAuditBatch(offset) {
+    if (stopAuditRequested) return;
+
+    const limit = 100;
+    const resp = await adminFetch(`/api/products?limit=${limit}&offset=${offset}`);
+    const result = await resp.json();
+
+    const products = result.data || [];
+    totalToScan = result.total_count || products.length;
+
+    if (offset === 0) auditBody.innerHTML = ''; // Start clean
+
+    for (let i = 0; i < products.length; i++) {
+        if (stopAuditRequested) break;
+
+        const p = products[i];
+        scannedCount++;
+
+        try {
+            const sResp = await fetch(`/api/shopify-product?code=${encodeURIComponent(p.code)}`, {
+                headers: { 'Authorization': `Bearer ${authToken}` }
+            });
+            const sData = await sResp.json();
+            const auditResult = calculateAuditScore(p, sData);
+
+            fullAuditData.push(auditResult);
+
+            if (auditResult.status !== 'match') {
+                const rowId = `audit-row-${p.code.replace(/[^a-zA-Z0-9]/g, '-')}`;
+                renderAuditRow(rowId, auditResult);
+            }
+
+            const percent = Math.round((scannedCount / totalToScan) * 100);
+            progressBarFill.style.width = `${percent}%`;
+            progressStats.textContent = `${scannedCount} / ${totalToScan}`;
+
+            if (i % 3 === 0) await new Promise(r => setTimeout(r, 50));
+        } catch (e) { console.error(e); }
+    }
+
+    if (!stopAuditRequested && scannedCount < totalToScan && products.length > 0) {
+        await processAuditBatch(offset + limit);
+    }
 }
 
 function calculateAuditScore(hamur, shopify) {
