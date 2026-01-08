@@ -27,17 +27,24 @@ app.use(express.json());
 // Initialize Cache (expire in 10 minutes)
 const shopifyCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
-// SECURITY: Global Rate Limiting (100 requests per 15 minutes per IP)
+// SECURITY: Rate Limiting
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 50000, // Increased for massive stock audit (36k+ products)
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: 'Çok fazla istek atıldı, lütfen 15 dakika sonra tekrar deneyin.' }
+  message: { error: 'Çok fazla istek, lütfen biraz bekleyin.' }
 });
 
-// Apply rate limiting to all API routes
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // Strict for authentication
+  message: { error: 'Çok fazla giriş denemesi. Lütfen 15 dakika bekleyin.' }
+});
+
+// Apply rate limiting
 app.use('/api/', apiLimiter);
+app.use('/api/auth/login', loginLimiter);
 
 // Basic Security Headers
 app.use((req, res, next) => {
