@@ -255,8 +255,9 @@ function downloadAuditCSV() {
         return showToast('Önce raporu başlatın', 'warning');
     }
 
-    // Prepare CSV with UTF-8 BOM for Turkish characters in Excel
-    let csvContent = "\ufeffÜrün Kodu,Ürün Adı,Hamurlabs Stok,Shopify Stok,Durum\n";
+    // Use semicolon (;) for better compatibility with Excel in certain regions (like Turkey)
+    // and include UTF-8 BOM for Turkish character support
+    let csvContent = "\ufeffÜrün Kodu;Ürün Adı;Hamurlabs Stok;Shopify Stok;Durum\n";
     fullAuditData.forEach(r => {
         const st = { 'match': 'Eşleşiyor', 'mismatch': 'Farklı', 'not_mapped': 'Yok' };
         const row = [
@@ -265,7 +266,7 @@ function downloadAuditCSV() {
             r.hamurStock,
             r.shopifyFound ? r.shopifyStock : 0,
             st[r.status] || r.status
-        ].join(",");
+        ].join(";");
         csvContent += row + "\n";
     });
 
