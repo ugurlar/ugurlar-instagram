@@ -195,6 +195,31 @@
         #toast.show {
             transform: translateY(0);
         }
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .row-animate {
+            animation: slideIn 0.4s ease forwards;
+        }
+
+        .audit-scroll-container {
+            max-height: 600px;
+            overflow-y: auto;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.1);
+            scrollbar-width: thin;
+        }
     </style>
 </head>
 
@@ -275,13 +300,15 @@
                 <div style="display: flex; gap: 0.5rem;">
                     <button id="btnStartAudit" class="btn" style="padding: 0.5rem 1rem; font-size: 0.8rem;">Raporu
                         Başlat</button>
+                    <button id="btnExportCSV" class="btn btn-secondary"
+                        style="padding: 0.5rem 1rem; font-size: 0.8rem;">📥 Excel (CSV) İndir</button>
                     <button id="btnFilterMismatches" class="btn btn-secondary"
                         style="padding: 0.5rem 1rem; font-size: 0.8rem;">Sadece Hataları Göster</button>
                 </div>
             </div>
             <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 1rem;">Sistemdeki ürünleri toplu tarar ve
                 stok farklarını işaretler. (Max 50 ürün)</p>
-            <div style="max-height: 600px; overflow-y: auto;">
+            <div class="audit-scroll-container">
                 <table>
                     <thead>
                         <tr>

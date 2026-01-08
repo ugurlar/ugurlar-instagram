@@ -17,6 +17,7 @@ const inspectCodeInput = document.getElementById('inspectCode');
 const inspectorResult = document.getElementById('inspectorResult');
 const auditBody = document.getElementById('auditBody');
 const btnStartAudit = document.getElementById('btnStartAudit');
+const btnExportCSV = document.getElementById('btnExportCSV');
 const btnFilterMismatches = document.getElementById('btnFilterMismatches');
 
 // Auth Fetch Wrapper
@@ -179,17 +180,18 @@ let onlyMismatches = false;
 
 btnStartAudit.addEventListener('click', runGlobalAudit);
 btnFilterMismatches.addEventListener('click', toggleAuditFilter);
+if (btnExportCSV) btnExportCSV.addEventListener('click', downloadAuditCSV);
 
 async function runGlobalAudit() {
     btnStartAudit.disabled = true;
     btnStartAudit.textContent = '⌛ Tarama Başladı...';
-    auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Ürünler alınıyor...</td></tr>';
+    auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">📡 Ürün listesi çekiliyor...</td></tr>';
     try {
-        const resp = await adminFetch('/api/products?limit=50');
+        const resp = await adminFetch('/api/products?limit=100');
         const data = await resp.json();
         const products = data.data || [];
         if (products.length === 0) {
-            auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Ürün yok.</td></tr>';
+            auditBody.innerHTML = '<tr><td colspan="5" style="text-align:center;">Ürün bulunamadı.</td></tr>';
             return;
         }
         fullAuditData = [];
@@ -197,14 +199,14 @@ async function runGlobalAudit() {
         for (let i = 0; i < products.length; i++) {
             const p = products[i];
             const rowId = `audit-row-${p.code.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            auditBody.insertAdjacentHTML('beforeend', `<tr id="${rowId}"><td><strong>${p.code}</strong></td><td class="text-muted">${p.name.substring(0, 20)}...</td><td colspan="3" style="text-align:center;">⌛...</td></tr>`);
+            auditBody.insertAdjacentHTML('beforeend', `<tr id="${rowId}" class="row-animate"><td><strong>${p.code}</strong></td><td class="text-muted">${p.name.substring(0, 20)}...</td><td colspan="3" style="text-align:center;">⌛...</td></tr>`);
             try {
                 const sResp = await fetch(`/api/shopify-product?code=${encodeURIComponent(p.code)}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
                 const sData = await sResp.json();
                 const result = calculateAuditScore(p, sData);
                 fullAuditData.push(result);
                 updateAuditRow(rowId, result);
-                if (i % 5 === 0) await new Promise(r => setTimeout(r, 200));
+                if (i % 5 === 0) await new Promise(r => setTimeout(r, 100));
             } catch (e) { console.error(e); }
         }
     } catch (err) { showToast(err.message, 'error'); }
@@ -240,8 +242,40 @@ function updateAuditRow(rowId, result) {
 
     if (result.status !== 'match') {
         row.style.cursor = 'pointer';
-        row.onclick = () => { inspectCodeInput.value = result.code; inspectProduct(result.code); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+        row.onclick = () => {
+            inspectCodeInput.value = result.code;
+            inspectProduct(result.code);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
     }
+}
+
+function downloadAuditCSV() {
+    if (fullAuditData.length === 0) {
+        return showToast('Önce raporu başlatın', 'warning');
+    }
+
+    // Prepare CSV with UTF-8 BOM for Turkish characters in Excel
+    let csvContent = "\ufeffÜrün Kodu,Ürün Adı,Hamurlabs Stok,Shopify Stok,Durum\n";
+    fullAuditData.forEach(r => {
+        const st = { 'match': 'Eşleşiyor', 'mismatch': 'Farklı', 'not_mapped': 'Yok' };
+        const row = [
+            r.code,
+            `"${r.name.replace(/"/g, '""')}"`,
+            r.hamurStock,
+            r.shopifyFound ? r.shopifyStock : 0,
+            st[r.status] || r.status
+        ].join(",");
+        csvContent += row + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `ugurlar_stok_raporu_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 function toggleAuditFilter() {
