@@ -185,6 +185,7 @@ let isAuditRunning = false;
 let stopAuditRequested = false;
 let totalToScan = 0;
 let scannedCount = 0;
+let mismatchCount = 0;
 
 btnStartAudit.addEventListener('click', runFullCatalogAudit);
 btnStopAudit.addEventListener('click', () => {
@@ -203,6 +204,7 @@ async function runFullCatalogAudit() {
     stopAuditRequested = false;
     fullAuditData = [];
     scannedCount = 0;
+    mismatchCount = 0;
 
     // UI Setup
     btnStartAudit.disabled = true;
@@ -231,7 +233,7 @@ async function runFullCatalogAudit() {
             showToast('Tarama durduruldu.', 'info');
         } else {
             showToast('Tüm katalog taraması tamamlandı!', 'success');
-            progressStats.textContent = `Tamamlandı: ${scannedCount} / ${totalToScan}`;
+            progressStats.textContent = `Tamamlandı: ${scannedCount} / ${totalToScan} | Toplam Hata: ${mismatchCount}`;
         }
     }
 }
@@ -261,16 +263,16 @@ async function processAuditBatch(offset) {
             const sData = await sResp.json();
             const auditResult = calculateAuditScore(p, sData);
 
-            fullAuditData.push(auditResult);
-
             if (auditResult.status !== 'match') {
+                mismatchCount++;
                 const rowId = `audit-row-${p.code.replace(/[^a-zA-Z0-9]/g, '-')}`;
                 renderAuditRow(rowId, auditResult);
+                fullAuditData.push(auditResult);
             }
 
             const percent = Math.round((scannedCount / totalToScan) * 100);
             progressBarFill.style.width = `${percent}%`;
-            progressStats.textContent = `${scannedCount} / ${totalToScan}`;
+            progressStats.textContent = `Taranan: ${scannedCount} / ${totalToScan} | Hata: ${mismatchCount}`;
 
             if (i % 3 === 0) await new Promise(r => setTimeout(r, 50));
         } catch (e) { console.error(e); }
