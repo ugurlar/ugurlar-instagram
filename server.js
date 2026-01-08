@@ -478,20 +478,29 @@ async function getShopifyProductHandle(sku) {
   `;
 
   try {
-    console.log(`🔍 Shopify'da aranan SKU: ${sku} (veya ${cleanSku})`);
+    return await executeShopifyQuery(query, { query: sku }, sku, cleanSku);
+  } catch (error) {
+    console.error(`❌ Shopify API Hatası (${sku}):`, error.response?.data || error.message);
+    return null;
+  }
+}
+
+async function executeShopifyQuery(query, variables, sku, cleanSku, retryCount = 0) {
+  try {
     const response = await axios.post(
       `https://${SHOPIFY_DOMAIN}/admin/api/2024-01/graphql.json`,
-      {
-        query,
-        variables: { query: sku }
-      },
-      {
-        headers: {
-          'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-          'Content-Type': 'application/json',
-        },
-      }
+      { query, variables },
+      { headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN, 'Content-Type': 'application/json' } }
     );
+
+    if (response.data && response.data.errors) {
+      const isRateLimit = response.data.errors.some(e => e.extensions?.code === 'THROTTLED' || e.message?.includes('Throttled'));
+      if (isRateLimit && retryCount < 3) {
+        console.log(`⏳ Shopify Rate Limit (Throttled). Retrying in 2s...`);
+        await new Promise(r => setTimeout(r, 2000));
+        return executeShopifyQuery(query, variables, sku, cleanSku, retryCount + 1);
+      }
+    }
 
     const products = response.data?.data?.products?.edges || [];
     if (products.length === 0) {

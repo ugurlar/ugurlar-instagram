@@ -242,13 +242,27 @@ async function processAuditBatch(offset) {
     if (stopAuditRequested) return;
 
     const limit = 100;
-    const resp = await adminFetch(`/api/products?limit=${limit}&offset=${offset}`);
-    const result = await resp.json();
+    let products = [];
+    let retryCount = 0;
+    const maxRetries = 3;
 
-    const products = result.data || [];
-    totalToScan = result.total_count || products.length;
+    while (retryCount < maxRetries) {
+        try {
+            const resp = await adminFetch(`/api/products?limit=${limit}&offset=${offset}`);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const result = await resp.json();
+            products = result.data || [];
+            totalToScan = result.total_count || totalToScan;
+            break; // Success
+        } catch (err) {
+            retryCount++;
+            console.error(`Batch fetch failed (Attempt ${retryCount}):`, err);
+            if (retryCount >= maxRetries) throw err;
+            await new Promise(r => setTimeout(r, 2000 * retryCount)); // Exponential backoff
+        }
+    }
 
-    if (offset === 0) auditBody.innerHTML = ''; // Start clean
+    if (offset === 0) auditBody.innerHTML = '';
 
     for (let i = 0; i < products.length; i++) {
         if (stopAuditRequested) break;
@@ -284,11 +298,11 @@ async function processAuditBatch(offset) {
 }
 
 function calculateAuditScore(hamur, shopify) {
-    const hamurStock = (hamur.metas || []).reduce((sum, v) => sum + (parseInt(v.quantity) || 0), 0);
-    const shopifyStock = shopify.found ? (shopify.variants || []).reduce((sum, v) => sum + (parseInt(v.inventory) || 0), 0) : 0;
+    const hamurStock = (hamur.metas || []).reduce((sum, v) => sum + (Math.round(Number(v.quantity)) || 0), 0);
+    const shopifyStock = shopify.found ? (shopify.variants || []).reduce((sum, v) => sum + (Math.round(Number(v.inventory)) || 0), 0) : 0;
     let status = 'match';
     if (!shopify.found) status = 'not_mapped';
-    else if (hamurStock !== shopifyStock) status = 'mismatch';
+    else if (Math.abs(hamurStock - shopifyStock) > 0.01) status = 'mismatch';
     return { code: hamur.code, name: hamur.name, hamurStock, shopifyStock, status, shopifyFound: shopify.found };
 }
 
