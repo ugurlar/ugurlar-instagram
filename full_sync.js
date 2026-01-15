@@ -41,14 +41,12 @@ async function makeStealthRequest(endpoint, params = {}) {
     });
 }
 
-const globalMergedMap = new Map();
-
-function processAndMergeBatch(products) {
+function processAndMergeBatch(products, mergedMap) {
     products.forEach(p => {
         const code = p.code || p.sku || 'unknown-' + Math.random();
 
-        if (!globalMergedMap.has(code)) {
-            globalMergedMap.set(code, {
+        if (!mergedMap.has(code)) {
+            mergedMap.set(code, {
                 code: code,
                 name: p.name || p.title || '-',
                 barcode: p.barcode || (p.metas && p.metas[0] ? p.metas[0].barcode : null),
@@ -59,7 +57,7 @@ function processAndMergeBatch(products) {
                 data: JSON.parse(JSON.stringify(p))
             });
         } else {
-            const existing = globalMergedMap.get(code);
+            const existing = mergedMap.get(code);
 
             const existingMetas = existing.data.metas || [];
             const newMetas = p.metas || [];
@@ -103,6 +101,7 @@ async function uploadToSupabase(products) {
 
 async function startFullSync() {
     console.log("🚀 CORRECTED FULL SYNC Başlatılıyor (Global Aggregation)...");
+    const syncMergedMap = new Map();
     let offset = 0;
     const limit = 100;
     let hasMore = true;
@@ -115,7 +114,7 @@ async function startFullSync() {
             const products = response.data.results || response.data.data || [];
 
             if (products.length > 0) {
-                processAndMergeBatch(products);
+                processAndMergeBatch(products, syncMergedMap);
                 totalFetched += products.length;
                 console.log(`✅ ${totalFetched} kayıt hafızada birleştirildi.`);
                 offset += limit;
@@ -126,10 +125,13 @@ async function startFullSync() {
         } catch (error) {
             console.error(`❌ Hata (Offset: ${offset}):`, error.message);
             await new Promise(r => setTimeout(r, 5000));
+            // Let's not stop completely on one error, but maybe limit retries 
+            // For now, retry once or just break depending on error type
+            if (error.response?.status === 401 || error.response?.status === 403) break;
         }
     }
 
-    const finalProducts = Array.from(globalMergedMap.values());
+    const finalProducts = Array.from(syncMergedMap.values());
     console.log(`\n📦 Bağımsız Ürün Sayısı: ${finalProducts.length}`);
     console.log(`📤 Supabase'e yükleniyor (batchler halinde)...`);
 
@@ -140,6 +142,12 @@ async function startFullSync() {
     }
 
     console.log(`🎉 TÜM İŞLEM TAMAMLANDI. Toplam: ${finalProducts.length} birleşmiş ürün.`);
+    return { count: finalProducts.length, timestamp: new Date().toISOString() };
 }
 
-startFullSync();
+// Allow running as a standalone script or as a module
+if (require.main === module) {
+    startFullSync().catch(console.error);
+}
+
+module.exports = { startFullSync };

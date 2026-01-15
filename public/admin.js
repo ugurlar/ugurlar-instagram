@@ -23,6 +23,8 @@ const btnFilterMismatches = document.getElementById('btnFilterMismatches');
 const progressWrapper = document.getElementById('progressWrapper');
 const progressBarFill = document.getElementById('progressBarFill');
 const progressStats = document.getElementById('progressStats');
+const lastSyncTime = document.getElementById('lastSyncTime');
+const lastSyncCount = document.getElementById('lastSyncCount');
 
 // Auth Fetch Wrapper
 async function adminFetch(url, options = {}) {
@@ -72,6 +74,32 @@ async function loadDiagnostics() {
     } catch (err) {
         console.error('Diagnostic error:', err);
     }
+    updateSyncStatus();
+}
+
+async function updateSyncStatus() {
+    try {
+        const resp = await adminFetch('/api/admin/sync-status');
+        const data = await resp.json();
+
+        if (data.status === 'running') {
+            lastSyncTime.textContent = '⏳ Devam Ediyor...';
+            lastSyncTime.style.color = 'var(--warning)';
+            lastSyncCount.textContent = 'Ürünler Hamurlabs\'tan çekiliyor...';
+            btnSyncHamur.disabled = true;
+        } else {
+            const dateStr = data.timestamp === 'Henüz yapılmadı' ? data.timestamp : new Date(data.timestamp).toLocaleString();
+            lastSyncTime.textContent = dateStr;
+            lastSyncTime.style.color = data.status === 'failed' ? 'var(--error)' : 'var(--primary)';
+            lastSyncCount.textContent = data.count > 0 ? `${data.count} ürün başarıyla işlendi.` : '-';
+            btnSyncHamur.disabled = false;
+        }
+
+        // Poll if running
+        if (data.status === 'running') {
+            setTimeout(updateSyncStatus, 5000);
+        }
+    } catch (e) { console.error(e); }
 }
 
 function prepareOverride(code) {
@@ -83,17 +111,16 @@ function prepareOverride(code) {
 btnRefreshData.addEventListener('click', loadDiagnostics);
 
 btnSyncHamur.addEventListener('click', async () => {
-    if (!confirm('Tüm ürünlerin senkronizasyonunu tetiklemek istiyor musunuz?')) return;
+    if (!confirm('Tüm ürünlerin senkronizasyonunu (Full Sync) arka planda başlatmak istiyor musunuz? Bu işlem yaklaşık 1 saat sürebilir.')) return;
     btnSyncHamur.disabled = true;
     try {
-        const resp = await adminFetch('/api/cron');
+        const resp = await adminFetch('/api/admin/trigger-sync', { method: 'POST' });
         const data = await resp.json();
-        showToast(`Başarılı! ${data.count || 0} ürün güncellendi.`, 'success');
+        showToast(data.message || 'Senkronizasyon başlatıldı.', 'info');
+        updateSyncStatus();
     } catch (err) {
         showToast('Hata: ' + err.message, 'error');
-    } finally {
         btnSyncHamur.disabled = false;
-        loadDiagnostics();
     }
 });
 

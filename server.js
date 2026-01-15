@@ -4,6 +4,8 @@ const axios = require('axios');
 const path = require('path');
 const rateLimit = require('express-rate-limit');
 const NodeCache = require('node-cache');
+const cron = require('node-cron');
+const { startFullSync } = require('./full_sync');
 require('dotenv').config();
 
 const app = express();
@@ -26,6 +28,9 @@ app.use(express.json());
 
 // Initialize Cache (expire in 10 minutes)
 const shopifyCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
+
+// Global State for Automation
+let lastSyncInfo = { status: 'idle', count: 0, timestamp: 'Henüz yapılmadı' };
 
 // SECURITY: Rate Limiting
 const apiLimiter = rateLimit({
@@ -91,6 +96,41 @@ app.post('/api/auth/login', (req, res) => {
 
     res.status(401).json({ success: false, error: 'Hatalı şifre' });
   }
+});
+
+// ==========================================
+// AUTOMATED DATA SYNC (CRON)
+// ==========================================
+// Runs every night at 03:00
+cron.schedule('0 3 * * *', async () => {
+  console.log('⏰ [CRON] Daily Full Sync started...');
+  lastSyncInfo.status = 'running';
+  try {
+    const result = await startFullSync();
+    lastSyncInfo = { status: 'success', ...result };
+    console.log(`✅ [CRON] Sync complete: ${result.count} products.`);
+  } catch (err) {
+    lastSyncInfo.status = 'failed';
+    console.error('❌ [CRON] Sync failed:', err.message);
+  }
+});
+
+// Manual Sync Status Endpoint
+app.get('/api/admin/sync-status', authenticate, (req, res) => {
+  res.json(lastSyncInfo);
+});
+
+// Manual Sync Trigger (Optional but helpful)
+app.post('/api/admin/trigger-sync', authenticate, async (req, res) => {
+  if (lastSyncInfo.status === 'running') return res.status(429).json({ error: 'Sync zaten çalışıyor.' });
+
+  // Run in background to avoid timeout
+  lastSyncInfo.status = 'running';
+  startFullSync()
+    .then(result => { lastSyncInfo = { status: 'success', ...result }; })
+    .catch(err => { lastSyncInfo.status = 'failed'; console.error(err); });
+
+  res.json({ message: 'Senkronizasyon arka planda başlatıldı.' });
 });
 
 // ==========================================
